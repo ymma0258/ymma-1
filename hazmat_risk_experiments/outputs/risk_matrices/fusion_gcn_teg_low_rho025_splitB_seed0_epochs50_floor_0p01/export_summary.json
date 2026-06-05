@@ -1,0 +1,30 @@
+{
+  "name": "fusion_gcn_teg_low_rho025_splitB_seed0_epochs50_floor_0p01",
+  "risk_dirs": [
+    "hazmat_risk_experiments\\outputs\\risk_matrices\\gcn_splitB_seed0_epochs50_floor_0p01",
+    "hazmat_risk_experiments\\outputs\\risk_matrices\\teg_gnn_splitB_seed0_epochs50_teg_low_tail_floor_0p01"
+  ],
+  "weights": [
+    0.75,
+    0.25
+  ],
+  "ensemble": "mean node probabilities",
+  "summaries": [
+    {
+      "year": "data_2020",
+      "edge_count": 6603,
+      "risk_mean": 0.01971879531503083,
+      "risk_p95": 0.1144062762139435,
+      "risk_p99": 0.43251109997087134,
+      "risk_max": 0.8847425550920889
+    },
+    {
+      "year": "data_2021",
+      "edge_count": 7647,
+      "risk_mean": 0.01740113944284154,
+      "risk_p95": 0.09961381037791102,
+      "risk_p99": 0.37715776875388785,
+      "risk_max": 0.8538931662693762
+    }
+  ]
+}

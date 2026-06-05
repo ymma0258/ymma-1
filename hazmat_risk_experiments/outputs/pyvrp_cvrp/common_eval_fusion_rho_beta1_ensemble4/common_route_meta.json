@@ -1,0 +1,12 @@
+{
+  "common_risk_dir": "hazmat_risk_experiments\\outputs\\risk_matrices\\ensemble_graph4_teg_low_tail_splitB_seed0_epochs50_floor_0p01",
+  "beta": 1.0,
+  "run_dirs": {
+    "GCN": "hazmat_risk_experiments\\outputs\\pyvrp_cvrp\\fusion_rho_pyvrp50_beta1_fixedAB_B_GCN",
+    "TEG-low": "hazmat_risk_experiments\\outputs\\pyvrp_cvrp\\fusion_rho_pyvrp50_beta1_fixedAB_B_TEG-low",
+    "Fusion-rho025": "hazmat_risk_experiments\\outputs\\pyvrp_cvrp\\fusion_rho_pyvrp50_beta1_fixedAB_B_Fusion-rho025",
+    "Fusion-rho050": "hazmat_risk_experiments\\outputs\\pyvrp_cvrp\\fusion_rho_pyvrp50_beta1_fixedAB_B_Fusion-rho050",
+    "Fusion-rho075": "hazmat_risk_experiments\\outputs\\pyvrp_cvrp\\fusion_rho_pyvrp50_beta1_fixedAB_B_Fusion-rho075",
+    "Ensemble-4": "hazmat_risk_experiments\\outputs\\pyvrp_cvrp\\fusion_rho_pyvrp50_beta1_fixedAB_B_Ensemble-4"
+  }
+}

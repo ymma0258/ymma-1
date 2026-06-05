@@ -1,0 +1,26 @@
+{
+  "name": "teg_low_tail_score_eta025_splitB_seed0_epochs50_floor_0p01",
+  "base_risk_dir": "hazmat_risk_experiments\\outputs\\risk_matrices\\teg_gnn_splitB_seed0_epochs50_teg_low_tail_floor_0p01",
+  "eta": 0.25,
+  "definition": "S_tail = clip(S_norm + eta * P_high, 0, 1)",
+  "summaries": [
+    {
+      "year": "data_2020",
+      "eta": 0.25,
+      "edge_count": 6603,
+      "risk_mean": 0.026296043768525124,
+      "risk_p95": 0.13201865553855896,
+      "risk_p99": 0.5049999952316284,
+      "risk_max": 1.0
+    },
+    {
+      "year": "data_2021",
+      "eta": 0.25,
+      "edge_count": 7647,
+      "risk_mean": 0.022382741793990135,
+      "risk_p95": 0.10805405676364899,
+      "risk_p99": 0.5049999952316284,
+      "risk_max": 0.9999998807907104
+    }
+  ]
+}

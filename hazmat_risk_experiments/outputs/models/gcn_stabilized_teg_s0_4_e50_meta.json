@@ -1,0 +1,30 @@
+{
+  "models": [
+    "gcn",
+    "teg_gnn",
+    "gcn_teg_concat",
+    "gcn_teg_residual_fixed",
+    "gcn_teg_residual_learnable"
+  ],
+  "splits": [
+    "A",
+    "B"
+  ],
+  "seeds": [
+    0,
+    1,
+    2,
+    3,
+    4
+  ],
+  "epochs": 50,
+  "experiment_tag": "gcn_stabilized_lowtail_s0_4",
+  "alpha_ord": 0.3,
+  "alpha_hr": 0.5,
+  "alpha_topk": 0.1,
+  "topk_frac": 0.2,
+  "stage1_epochs": 0,
+  "elapsed_seconds": 646.6958603858948,
+  "num_metric_rows": 150,
+  "num_failures": 0
+}

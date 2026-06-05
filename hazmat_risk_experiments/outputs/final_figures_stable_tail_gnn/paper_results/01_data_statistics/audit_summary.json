@@ -1,0 +1,154 @@
+[
+  {
+    "year": "data_2020",
+    "node_count": 4696,
+    "feature_dim": 715,
+    "edge_count": 7048,
+    "edge_attr_dim": 1,
+    "label_summary": {
+      "unlabeled_count": 4277,
+      "labeled_count": 419,
+      "high_risk_count_6_8": 40,
+      "label_counts": {
+        "0": 4277,
+        "1": 255,
+        "2": 61,
+        "3": 40,
+        "4": 11,
+        "5": 12,
+        "6": 9,
+        "7": 23,
+        "8": 8
+      }
+    },
+    "edge_attribute_summary": {
+      "min": 0.1111111111111111,
+      "max": 1.0,
+      "mean": 0.12348656829360577,
+      "std": 0.05336137757122609,
+      "p50": 0.1111111111111111,
+      "p90": 0.1111111111111111,
+      "p95": 0.2222222222222222,
+      "p99": 0.3333333333333333
+    },
+    "feature_summary": {
+      "feature_global_min": -1.7781089345267755,
+      "feature_global_max": 68.51960045572197,
+      "feature_global_mean": -4.2747177369682347e-19,
+      "feature_global_std": 0.8857823029965027,
+      "feature_mean_abs_mean": 1.0702665819166757e-17,
+      "feature_mean_std": 0.7846128364002516,
+      "near_zero_std_feature_count": 154
+    },
+    "graph_summary": {
+      "largest_weak_component": 3706,
+      "weak_component_count": 192,
+      "largest_strong_component": 2324,
+      "strong_component_count": 1661,
+      "top5_weak_components": [
+        3706,
+        37,
+        22,
+        19,
+        16
+      ],
+      "top5_strong_components": [
+        2324,
+        31,
+        17,
+        15,
+        14
+      ]
+    },
+    "undirected_summary": {
+      "directed_edge_count": 7048,
+      "undirected_edge_count_max_merge": 6603,
+      "reciprocal_directed_edge_count": 890,
+      "self_loop_count": 0,
+      "undirected_weight_min": 0.1111111111111111,
+      "undirected_weight_max": 1.0,
+      "undirected_weight_mean": 0.12305854241338116,
+      "undirected_weight_std": 0.0526332904373547,
+      "undirected_weight_p50": 0.1111111111111111,
+      "undirected_weight_p90": 0.1111111111111111,
+      "undirected_weight_p95": 0.2222222222222222,
+      "undirected_weight_p99": 0.3333333333333333
+    }
+  },
+  {
+    "year": "data_2021",
+    "node_count": 5261,
+    "feature_dim": 715,
+    "edge_count": 8115,
+    "edge_attr_dim": 1,
+    "label_summary": {
+      "unlabeled_count": 4818,
+      "labeled_count": 443,
+      "high_risk_count_6_8": 51,
+      "label_counts": {
+        "0": 4818,
+        "1": 262,
+        "2": 62,
+        "3": 44,
+        "4": 12,
+        "5": 12,
+        "6": 11,
+        "7": 29,
+        "8": 11
+      }
+    },
+    "edge_attribute_summary": {
+      "min": 0.06666666666666667,
+      "max": 1.0,
+      "mean": 0.0744547134935305,
+      "std": 0.03632501237148198,
+      "p50": 0.06666666666666667,
+      "p90": 0.06666666666666667,
+      "p95": 0.13333333333333333,
+      "p99": 0.2
+    },
+    "feature_summary": {
+      "feature_global_min": -1.6164684276899726,
+      "feature_global_max": 72.52533136169127,
+      "feature_global_mean": 1.5867011856303321e-18,
+      "feature_global_std": 0.8778526707334602,
+      "feature_mean_abs_mean": 1.1271481324171899e-17,
+      "feature_mean_std": 0.7706273410476668,
+      "near_zero_std_feature_count": 164
+    },
+    "graph_summary": {
+      "largest_weak_component": 4357,
+      "weak_component_count": 161,
+      "largest_strong_component": 2823,
+      "strong_component_count": 1667,
+      "top5_weak_components": [
+        4357,
+        36,
+        35,
+        27,
+        21
+      ],
+      "top5_strong_components": [
+        2823,
+        32,
+        29,
+        19,
+        19
+      ]
+    },
+    "undirected_summary": {
+      "directed_edge_count": 8115,
+      "undirected_edge_count_max_merge": 7647,
+      "reciprocal_directed_edge_count": 936,
+      "self_loop_count": 0,
+      "undirected_weight_min": 0.06666666666666667,
+      "undirected_weight_max": 1.0,
+      "undirected_weight_mean": 0.0738415936532845,
+      "undirected_weight_std": 0.03419976363856738,
+      "undirected_weight_p50": 0.06666666666666667,
+      "undirected_weight_p90": 0.06666666666666667,
+      "undirected_weight_p95": 0.13333333333333333,
+      "undirected_weight_p99": 0.2
+    }
+  }
+]

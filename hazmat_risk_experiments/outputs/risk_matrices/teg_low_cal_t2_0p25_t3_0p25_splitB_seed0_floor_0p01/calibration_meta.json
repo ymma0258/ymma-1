@@ -1,0 +1,8 @@
+{
+  "source_risk_dir": "hazmat_risk_experiments\\outputs\\risk_matrices\\teg_gnn_splitB_seed0_epochs50_teg_low_tail_floor_0p01",
+  "year": "data_2021",
+  "formula": "R=w_floor*Normalize(theta1*max(S)+theta2*max(P_high)+theta3*avg(S))",
+  "theta1": 1.0,
+  "theta2": 0.25,
+  "theta3": 0.25
+}

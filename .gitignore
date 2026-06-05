@@ -1,0 +1,7 @@
+*
+!/.gitignore
+!/hazmat_risk_experiments/
+!/hazmat_risk_experiments/**
+
+hazmat_risk_experiments/**/__pycache__/
+hazmat_risk_experiments/**/*.pyc

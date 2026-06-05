@@ -1,0 +1,17 @@
+{
+  "common_risk_dir": "hazmat_risk_experiments\\outputs\\risk_matrices\\ensemble_graph4_teg_low_tail_splitB_seed0_epochs50_floor_0p01",
+  "beta": 1.0,
+  "lambda_concentration": null,
+  "run_dirs": {
+    "GCN-A": "hazmat_risk_experiments\\outputs\\pyvrp_cvrp\\model_pyvrp50_concat_downstream_beta1_fixedAB_A_GCN",
+    "GCN-B": "hazmat_risk_experiments\\outputs\\pyvrp_cvrp\\model_pyvrp50_concat_downstream_beta1_fixedAB_B_GCN",
+    "TEG-low-A": "hazmat_risk_experiments\\outputs\\pyvrp_cvrp\\model_pyvrp50_concat_downstream_beta1_fixedAB_A_TEG-low",
+    "TEG-low-B": "hazmat_risk_experiments\\outputs\\pyvrp_cvrp\\model_pyvrp50_concat_downstream_beta1_fixedAB_B_TEG-low",
+    "GCN+TEG-concat-A": "hazmat_risk_experiments\\outputs\\pyvrp_cvrp\\model_pyvrp50_concat_downstream_beta1_fixedAB_A_GCN+TEG-concat",
+    "GCN+TEG-concat-B": "hazmat_risk_experiments\\outputs\\pyvrp_cvrp\\model_pyvrp50_concat_downstream_beta1_fixedAB_B_GCN+TEG-concat",
+    "Edge-GAT-A": "hazmat_risk_experiments\\outputs\\pyvrp_cvrp\\model_pyvrp50_concat_downstream_beta1_fixedAB_A_Edge-GAT",
+    "Edge-GAT-B": "hazmat_risk_experiments\\outputs\\pyvrp_cvrp\\model_pyvrp50_concat_downstream_beta1_fixedAB_B_Edge-GAT",
+    "Label-reference-A": "hazmat_risk_experiments\\outputs\\pyvrp_cvrp\\model_pyvrp50_concat_downstream_beta1_fixedAB_A_Label-reference",
+    "Label-reference-B": "hazmat_risk_experiments\\outputs\\pyvrp_cvrp\\model_pyvrp50_concat_downstream_beta1_fixedAB_B_Label-reference"
+  }
+}

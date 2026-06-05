@@ -1,0 +1,102 @@
+{
+  "pairs": "hazmat_risk_experiments\\outputs\\od_paths\\od_formal_floor001_p50_k50_cached_floor_0p01_a0p9_l1_p75\\od_pairs.csv",
+  "num_pairs": 150,
+  "year": "data_2021",
+  "k_paths": 50,
+  "cvar_alpha": 0.9,
+  "re_threshold": "p75",
+  "sources": [
+    {
+      "risk_source": "Eta0",
+      "risk_dir": "hazmat_risk_experiments\\outputs\\risk_matrices\\teg_gnn_splitB_seed0_epochs50_teg_low_tail_floor_0p01",
+      "largest_component_nodes": 4357,
+      "largest_component_edges": 6650,
+      "re_threshold": "p75",
+      "re_threshold_value": 0.004911081399768591,
+      "risk_diagnostics": {
+        "edge_count": 6650,
+        "zero_risk_edge_count": 0,
+        "zero_risk_edge_ratio": 0.0,
+        "risk_min": 1.1069433369925719e-08,
+        "risk_p25": 0.0029098838567733765,
+        "risk_p50": 0.0037547035608440638,
+        "risk_p75": 0.004911081399768591,
+        "risk_p90": 0.008557505905628204,
+        "risk_p95": 0.11264356933534139,
+        "risk_p99": 0.4321845489740372,
+        "risk_max": 0.8571691513061523,
+        "edge_attribute_zero_ratio": 0.0,
+        "S_i_norm_zero_or_near_zero_ratio": 0.0009180628873077806
+      }
+    },
+    {
+      "risk_source": "Eta025",
+      "risk_dir": "hazmat_risk_experiments\\outputs\\risk_matrices\\teg_low_tail_score_eta025_splitB_seed0_epochs50_floor_0p01",
+      "largest_component_nodes": 4357,
+      "largest_component_edges": 6650,
+      "re_threshold": "p75",
+      "re_threshold_value": 0.005991827696561813,
+      "risk_diagnostics": {
+        "edge_count": 6650,
+        "zero_risk_edge_count": 0,
+        "zero_risk_edge_ratio": 0.0,
+        "risk_min": 1.132248605983932e-08,
+        "risk_p25": 0.003417553147301078,
+        "risk_p50": 0.004436757182702422,
+        "risk_p75": 0.005991827696561813,
+        "risk_p90": 0.009999999776482582,
+        "risk_p95": 0.1264267519116394,
+        "risk_p99": 0.5049999952316284,
+        "risk_max": 0.9999998807907104,
+        "edge_attribute_zero_ratio": 0.0,
+        "S_i_norm_zero_or_near_zero_ratio": 0.0009180628873077806
+      }
+    },
+    {
+      "risk_source": "Eta050",
+      "risk_dir": "hazmat_risk_experiments\\outputs\\risk_matrices\\teg_low_tail_score_eta050_splitB_seed0_epochs50_floor_0p01",
+      "largest_component_nodes": 4357,
+      "largest_component_edges": 6650,
+      "re_threshold": "p75",
+      "re_threshold_value": 0.007060866337269545,
+      "risk_diagnostics": {
+        "edge_count": 6650,
+        "zero_risk_edge_count": 0,
+        "zero_risk_edge_ratio": 0.0,
+        "risk_min": 1.1575537861574503e-08,
+        "risk_p25": 0.003923010313883424,
+        "risk_p50": 0.005127913784235716,
+        "risk_p75": 0.007060866337269545,
+        "risk_p90": 0.009999999776482582,
+        "risk_p95": 0.14131884500384329,
+        "risk_p99": 0.5049999952316284,
+        "risk_max": 0.9999998807907104,
+        "edge_attribute_zero_ratio": 0.0,
+        "S_i_norm_zero_or_near_zero_ratio": 0.0009180628873077806
+      }
+    },
+    {
+      "risk_source": "Eta100",
+      "risk_dir": "hazmat_risk_experiments\\outputs\\risk_matrices\\teg_low_tail_score_eta100_splitB_seed0_epochs50_floor_0p01",
+      "largest_component_nodes": 4357,
+      "largest_component_edges": 6650,
+      "re_threshold": "p75",
+      "re_threshold_value": 0.00924935843795538,
+      "risk_diagnostics": {
+        "edge_count": 6650,
+        "zero_risk_edge_count": 0,
+        "zero_risk_edge_ratio": 0.0,
+        "risk_min": 1.2081643241401707e-08,
+        "risk_p25": 0.004843814065679908,
+        "risk_p50": 0.0064955768175423145,
+        "risk_p75": 0.00924935843795538,
+        "risk_p90": 0.009999999776482582,
+        "risk_p95": 0.17386360466480255,
+        "risk_p99": 0.5603578436374674,
+        "risk_max": 0.9999998807907104,
+        "edge_attribute_zero_ratio": 0.0,
+        "S_i_norm_zero_or_near_zero_ratio": 0.0009180628873077806
+      }
+    }
+  ]
+}

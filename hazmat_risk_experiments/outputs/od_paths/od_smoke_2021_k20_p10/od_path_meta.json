@@ -1,0 +1,13 @@
+{
+  "year": "data_2021",
+  "risk_dir": "hazmat_risk_experiments\\outputs\\risk_matrices\\teg_gnn_splitB_seed0_epochs20",
+  "num_pairs": 30,
+  "num_successful_pairs": 30,
+  "num_failures": 0,
+  "pairs_per_group": 10,
+  "k_paths": 20,
+  "lambda_re": 1.0,
+  "seed": 0,
+  "largest_component_nodes": 4357,
+  "largest_component_edges": 6650
+}

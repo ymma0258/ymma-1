@@ -1,0 +1,9 @@
+{
+  "common_risk_dir": "hazmat_risk_experiments\\outputs\\risk_matrices\\ensemble_graph4_teg_low_tail_splitB_seed0_epochs50_floor_0p01",
+  "beta": 1.0,
+  "lambda_concentration": null,
+  "run_dirs": {
+    "GCN+TEG-concat-A": "hazmat_risk_experiments\\outputs\\pyvrp_cvrp\\concat_concentration_pyvrp50_beta1_lambda0_1_fixedAB_A_GCN+TEG-concat",
+    "GCN+TEG-concat-B": "hazmat_risk_experiments\\outputs\\pyvrp_cvrp\\concat_concentration_pyvrp50_beta1_lambda0_1_fixedAB_B_GCN+TEG-concat"
+  }
+}
