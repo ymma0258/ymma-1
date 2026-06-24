@@ -1,0 +1,31 @@
+{
+  "models": [
+    "teg_gnn"
+  ],
+  "splits": [
+    "A",
+    "B"
+  ],
+  "seeds": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9
+  ],
+  "epochs": 50,
+  "experiment_tag": "teg_low_tail_10seed",
+  "alpha_ord": 0.3,
+  "alpha_hr": 0.5,
+  "alpha_topk": 0.1,
+  "topk_frac": 0.2,
+  "stage1_epochs": 0,
+  "elapsed_seconds": 230.70509791374207,
+  "num_metric_rows": 60,
+  "num_failures": 0
+}

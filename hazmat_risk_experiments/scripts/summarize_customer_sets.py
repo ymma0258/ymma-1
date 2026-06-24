@@ -44,6 +44,46 @@ def write_csv(path: Path, rows: list[dict[str, object]]) -> None:
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
+        "--outputs-root",
+        type=Path,
+        default=OUTPUTS,
+        help="Experiment outputs root containing risk_matrices/ and pyvrp_cvrp/.",
+    )
+    parser.add_argument(
+        "--paper-root",
+        type=Path,
+        default=OUTPUTS / "final_figures_stable_tail_gnn" / "paper_results",
+        help="Paper-results root where the customer-set tables are mirrored.",
+    )
+    parser.add_argument(
+        "--source-out-dir",
+        type=Path,
+        default=None,
+        help="Optional source output directory. Defaults to outputs-root/pyvrp_cvrp/customer_set_composition.",
+    )
+    parser.add_argument(
+        "--paper-section",
+        default="10_customer_sets",
+        help="Paper-results section name for customer-set outputs.",
+    )
+    parser.add_argument(
+        "--risk-dir-pattern",
+        default=RISK_DIR_PATTERN,
+        help="Risk matrix directory pattern relative to outputs-root/risk_matrices, with {seed}.",
+    )
+    parser.add_argument(
+        "--meta-a",
+        type=Path,
+        default=META["A"],
+        help="Fixed Set A instance metadata.",
+    )
+    parser.add_argument(
+        "--meta-b",
+        type=Path,
+        default=META["B"],
+        help="Fixed Set B instance metadata.",
+    )
+    parser.add_argument(
         "--suffix",
         default="",
         help="Optional suffix for composition/detail outputs, e.g. '-1'.",
@@ -237,8 +277,12 @@ def write_aggregate_outputs(
     )
 
 
-def write_diagnostics_outputs(out_dir: Path, diagnostic_rows: list[dict[str, object]]) -> None:
-    write_csv(out_dir / "customer_set_diagnostics.csv", diagnostic_rows)
+def write_diagnostics_outputs(
+    out_dir: Path,
+    diagnostic_rows: list[dict[str, object]],
+    suffix: str = "",
+) -> None:
+    write_csv(out_dir / f"customer_set_diagnostics{suffix}.csv", diagnostic_rows)
 
     lines = [
         "# Customer-set diagnostics by model seed",
@@ -278,7 +322,9 @@ def write_diagnostics_outputs(out_dir: Path, diagnostic_rows: list[dict[str, obj
         ]
     )
     out_dir.mkdir(parents=True, exist_ok=True)
-    (out_dir / "customer_set_diagnostics.md").write_text("\n".join(lines), encoding="utf-8")
+    (out_dir / f"customer_set_diagnostics{suffix}.md").write_text(
+        "\n".join(lines), encoding="utf-8"
+    )
 
 
 def pct(value: float) -> str:
@@ -334,6 +380,7 @@ def customer_set_rows(
     risk_dir: Path,
     seed: int,
     include_detail: bool,
+    meta_paths: dict[str, Path],
 ) -> tuple[list[dict[str, object]], list[dict[str, object]], list[dict[str, object]]]:
     (
         node_risk,
@@ -347,7 +394,7 @@ def customer_set_rows(
     summary_rows: list[dict[str, object]] = []
     detail_rows: list[dict[str, object]] = []
     diagnostic_rows: list[dict[str, object]] = []
-    for set_name, meta_path in META.items():
+    for set_name, meta_path in meta_paths.items():
         meta = json.loads(meta_path.read_text(encoding="utf-8"))
         customers = [int(node) for node in meta["customers"]]
         risks = np.asarray([node_risk[node] for node in customers], dtype=float)
@@ -406,7 +453,7 @@ def customer_set_rows(
                 "risk_quintile_thresholds_global": json.dumps(
                     [float(val) for val in quintile_thresholds], ensure_ascii=False
                 ),
-                "risk_source": str(RISK_DIR),
+                "risk_source": str(risk_dir),
                 "instance_meta": str(meta_path),
             }
         )
@@ -433,10 +480,14 @@ def customer_set_rows(
 def main() -> None:
     args = parse_args()
     requested_seeds = parse_seed_csv(args.seeds)
+    source_out_dir = args.source_out_dir or args.outputs_root / "pyvrp_cvrp" / "customer_set_composition"
+    paper_out_dir = args.paper_root / args.paper_section
+    meta_paths = {"A": args.meta_a, "B": args.meta_b}
+
     first_seed = requested_seeds[0]
-    first_risk_dir = OUTPUTS / "risk_matrices" / RISK_DIR_PATTERN.format(seed=first_seed)
+    first_risk_dir = args.outputs_root / "risk_matrices" / args.risk_dir_pattern.format(seed=first_seed)
     summary_rows, detail_rows, diagnostic_rows = customer_set_rows(
-        first_risk_dir, first_seed, True
+        first_risk_dir, first_seed, True, meta_paths
     )
     all_summaries = list(summary_rows)
     all_details = list(detail_rows)
@@ -445,22 +496,27 @@ def main() -> None:
     for seed in requested_seeds:
         if seed == first_seed:
             continue
-        risk_dir = OUTPUTS / "risk_matrices" / RISK_DIR_PATTERN.format(seed=seed)
-        seed_summaries, seed_details, rows = customer_set_rows(risk_dir, seed, True)
+        risk_dir = args.outputs_root / "risk_matrices" / args.risk_dir_pattern.format(seed=seed)
+        seed_summaries, seed_details, rows = customer_set_rows(risk_dir, seed, True, meta_paths)
         all_summaries.extend(seed_summaries)
         all_details.extend(seed_details)
         all_diagnostics.extend(rows)
 
     if args.suffix:
-        write_aggregate_outputs(SOURCE_OUT_DIR, all_summaries, all_details, args.suffix)
-        write_aggregate_outputs(PAPER_OUT_DIR, all_summaries, all_details, args.suffix)
+        write_aggregate_outputs(source_out_dir, all_summaries, all_details, args.suffix)
+        write_aggregate_outputs(paper_out_dir, all_summaries, all_details, args.suffix)
+        # The suffixed 10seed paper table still needs per-seed diagnostics:
+        # composition/detail are aggregate views, while diagnostics preserve
+        # the seed-level values used to defend Set A/B construction.
+        write_diagnostics_outputs(source_out_dir, all_diagnostics, args.suffix)
+        write_diagnostics_outputs(paper_out_dir, all_diagnostics, args.suffix)
     else:
-        write_outputs(SOURCE_OUT_DIR, summary_rows, detail_rows, args.suffix)
-        write_outputs(PAPER_OUT_DIR, summary_rows, detail_rows, args.suffix)
-        write_diagnostics_outputs(SOURCE_OUT_DIR, all_diagnostics)
-        write_diagnostics_outputs(PAPER_OUT_DIR, all_diagnostics)
-    print(f"Wrote customer-set composition table to {SOURCE_OUT_DIR}")
-    print(f"Mirrored customer-set composition table to {PAPER_OUT_DIR}")
+        write_outputs(source_out_dir, summary_rows, detail_rows, args.suffix)
+        write_outputs(paper_out_dir, summary_rows, detail_rows, args.suffix)
+        write_diagnostics_outputs(source_out_dir, all_diagnostics)
+        write_diagnostics_outputs(paper_out_dir, all_diagnostics)
+    print(f"Wrote customer-set composition table to {source_out_dir}")
+    print(f"Mirrored customer-set composition table to {paper_out_dir}")
 
 
 if __name__ == "__main__":

@@ -27,6 +27,7 @@ OD_OUT = OUTPUTS / "od_paths" / "seed_robustness_splitB_fixed150"
 PYVRP_OUT = OUTPUTS / "pyvrp_cvrp"
 PAPER_SEED_OUT = OUTPUTS / "final_figures_stable_tail_gnn" / "paper_results" / "09_seed_robustness"
 COMPARE_PYVRP = SCRIPT_DIR / "compare_model_pyvrp.py"
+SEED_LABEL = ""
 
 if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
@@ -75,6 +76,16 @@ CONC_IMPROVEMENT_METRICS = {
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--outputs-root", type=Path, default=OUTPUTS)
+    parser.add_argument(
+        "--paper-root",
+        type=Path,
+        default=OUTPUTS / "final_figures_stable_tail_gnn" / "paper_results",
+    )
+    parser.add_argument("--seed-label", default="")
+    parser.add_argument("--gcn-pattern", default=MODEL_DIRS["GCN"])
+    parser.add_argument("--teg-low-pattern", default=MODEL_DIRS["TEG-low"])
+    parser.add_argument("--stable-tail-pattern", default=MODEL_DIRS["Stable-Tail GNN"])
     parser.add_argument("--seeds", default="0,1,2,3,4")
     parser.add_argument("--run-od", action="store_true")
     parser.add_argument("--run-pyvrp", action="store_true")
@@ -279,6 +290,8 @@ def run_compare_pyvrp(
         sys.executable,
         "-B",
         str(COMPARE_PYVRP),
+        "--output-dir",
+        str(PYVRP_OUT),
         "--betas",
         "0,1.0",
         "--lambda-concentration",
@@ -338,8 +351,9 @@ def aggregate_pyvrp_main(batch_dir: Path) -> None:
 
 def run_pyvrp(seeds: list[int], max_runtime: float, pyvrp_seeds: str) -> None:
     sources = validate_sources(seeds, ["GCN", "TEG-low", "Stable-Tail GNN"])
+    suffix = f"_{SEED_LABEL}" if SEED_LABEL else ""
     batch_dir = run_compare_pyvrp(
-        "seed_robustness_pyvrp50_beta1_splitB",
+        f"seed_robustness_pyvrp50_beta1_splitB{suffix}",
         sources,
         "0",
         max_runtime,
@@ -401,8 +415,9 @@ def aggregate_concentration(batch_dir: Path) -> None:
 
 def run_concentration(seeds: list[int], max_runtime: float, pyvrp_seeds: str) -> None:
     sources = validate_sources(seeds, ["Stable-Tail GNN"])
+    suffix = f"_{SEED_LABEL}" if SEED_LABEL else ""
     batch_dir = run_compare_pyvrp(
-        "seed_robustness_stable_tail_concentration_splitB",
+        f"seed_robustness_stable_tail_concentration_splitB{suffix}",
         sources,
         "0,1",
         max_runtime,
@@ -421,6 +436,19 @@ def mirror_to_paper(src_dir: Path, prefix: str) -> None:
 
 def main() -> None:
     args = parse_args()
+    global OUTPUTS, RISK_ROOT, OD_OUT, PYVRP_OUT, PAPER_SEED_OUT, SEED_LABEL, MODEL_DIRS
+    SEED_LABEL = args.seed_label
+    MODEL_DIRS = {
+        "GCN": args.gcn_pattern,
+        "TEG-low": args.teg_low_pattern,
+        "Stable-Tail GNN": args.stable_tail_pattern,
+    }
+    OUTPUTS = args.outputs_root
+    RISK_ROOT = OUTPUTS / "risk_matrices"
+    suffix = f"_{args.seed_label}" if args.seed_label else ""
+    OD_OUT = OUTPUTS / "od_paths" / f"seed_robustness_splitB_fixed150{suffix}"
+    PYVRP_OUT = OUTPUTS / "pyvrp_cvrp"
+    PAPER_SEED_OUT = args.paper_root / f"09_seed_robustness{suffix}"
     seeds = parse_seed_csv(args.seeds)
     if not (args.run_od or args.run_pyvrp or args.run_concentration):
         args.run_od = args.run_pyvrp = args.run_concentration = True

@@ -1,0 +1,32 @@
+{
+  "name": "label_reference_splitB_seed8_10seed_floor_0p01",
+  "base_risk_dir": "D:\\PyVRP-main\\hazmat_risk_experiments\\outputs_10seed\\risk_matrices\\gcn_teg_concat_splitB_seed8_epochs50_10seed_floor_0p01",
+  "definition": "labeled nodes use true y; unlabeled nodes use base predictions",
+  "risk_mode": "floor_0.01",
+  "summaries": [
+    {
+      "year": "data_2020",
+      "node_count": 4696,
+      "labeled_nodes": 419,
+      "edge_count": 6603,
+      "risk_mean": 0.017436020076274872,
+      "risk_p90": 0.008571428246796131,
+      "risk_p95": 0.05971240997314453,
+      "risk_p99": 0.4328571557998657,
+      "risk_max": 1.0,
+      "zero_risk_edge_ratio": 0.00408905043162199
+    },
+    {
+      "year": "data_2021",
+      "node_count": 5261,
+      "labeled_nodes": 443,
+      "edge_count": 7647,
+      "risk_mean": 0.01503805909305811,
+      "risk_p90": 0.008571428246796131,
+      "risk_p95": 0.051824092864990234,
+      "risk_p99": 0.4328571557998657,
+      "risk_max": 0.9999998807907104,
+      "zero_risk_edge_ratio": 0.006538511834706421
+    }
+  ]
+}

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import csv
+import argparse
 from pathlib import Path
 
 
@@ -52,8 +53,18 @@ def fmt(value: str) -> str:
     return f"{float(value):.4f}"
 
 
-def build_tables() -> tuple[list[dict[str, object]], dict[str, list[dict[str, object]]]]:
-    source_rows = read_rows(SOURCE)
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--source", type=Path, default=SOURCE)
+    parser.add_argument("--source-out-dir", type=Path, default=SOURCE_OUT_DIR)
+    parser.add_argument("--paper-out-dir", type=Path, default=PAPER_OUT_DIR)
+    parser.add_argument("--suffix", default="")
+    parser.add_argument("--note-label", default="gcn_stabilized_teg_s0_4_e50_summary.csv")
+    return parser.parse_args()
+
+
+def build_tables(source: Path) -> tuple[list[dict[str, object]], dict[str, list[dict[str, object]]]]:
+    source_rows = read_rows(source)
     by_key = {
         (row["model"], row["split"], row["eval_split"]): row
         for row in source_rows
@@ -69,7 +80,7 @@ def build_tables() -> tuple[list[dict[str, object]], dict[str, list[dict[str, ob
                 "split": split,
                 "model": model_name,
                 "source_model": model_key,
-                "source_file": str(SOURCE),
+                "source_file": str(source),
             }
             for src_col, dst_col in METRICS:
                 out[dst_col] = fmt(src[src_col])
@@ -84,7 +95,7 @@ def build_tables() -> tuple[list[dict[str, object]], dict[str, list[dict[str, ob
     return all_rows, split_tables
 
 
-def write_markdown(path: Path, split_tables: dict[str, list[dict[str, object]]]) -> None:
+def write_markdown(path: Path, split_tables: dict[str, list[dict[str, object]]], note_label: str) -> None:
     lines: list[str] = []
     for split, title_no in [("A", 2), ("B", 3)]:
         lines.extend(
@@ -107,7 +118,7 @@ def write_markdown(path: Path, split_tables: dict[str, list[dict[str, object]]])
             "Notes:",
             "",
             "- `High FN` is the high-risk false-negative rate for labels 6-8.",
-            "- Values are computed from `gcn_stabilized_teg_s0_4_e50_summary.csv`, `eval_split=data_2021_test`, and rounded to four decimals.",
+            f"- Values are computed from `{note_label}`, `eval_split=data_2021_test`, and rounded to four decimals.",
             "",
         ]
     )
@@ -115,14 +126,16 @@ def write_markdown(path: Path, split_tables: dict[str, list[dict[str, object]]])
 
 
 def main() -> None:
-    all_rows, split_tables = build_tables()
-    for out_dir in [SOURCE_OUT_DIR, PAPER_OUT_DIR]:
-        write_csv(out_dir / "node_risk_eval_with_high_fn.csv", all_rows)
-        write_csv(out_dir / "node_risk_eval_splitA_with_high_fn.csv", split_tables["A"])
-        write_csv(out_dir / "node_risk_eval_splitB_with_high_fn.csv", split_tables["B"])
-        write_markdown(out_dir / "node_risk_eval_with_high_fn.md", split_tables)
-    print(f"Wrote node-risk evaluation tables to {SOURCE_OUT_DIR}")
-    print(f"Mirrored node-risk evaluation tables to {PAPER_OUT_DIR}")
+    args = parse_args()
+    suffix = args.suffix
+    all_rows, split_tables = build_tables(args.source)
+    for out_dir in [args.source_out_dir, args.paper_out_dir]:
+        write_csv(out_dir / f"node_risk_eval_with_high_fn{suffix}.csv", all_rows)
+        write_csv(out_dir / f"node_risk_eval_splitA_with_high_fn{suffix}.csv", split_tables["A"])
+        write_csv(out_dir / f"node_risk_eval_splitB_with_high_fn{suffix}.csv", split_tables["B"])
+        write_markdown(out_dir / f"node_risk_eval_with_high_fn{suffix}.md", split_tables, args.note_label)
+    print(f"Wrote node-risk evaluation tables to {args.source_out_dir}")
+    print(f"Mirrored node-risk evaluation tables to {args.paper_out_dir}")
 
 
 if __name__ == "__main__":

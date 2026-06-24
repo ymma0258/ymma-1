@@ -1,0 +1,30 @@
+{
+  "name": "fusion_gcn_teg_low_rho075_splitB_seed7_epochs50_10seed_floor_0p01",
+  "risk_dirs": [
+    "D:\\PyVRP-main\\hazmat_risk_experiments\\outputs_10seed\\risk_matrices\\gcn_splitB_seed7_epochs50_10seed_floor_0p01",
+    "D:\\PyVRP-main\\hazmat_risk_experiments\\outputs_10seed\\risk_matrices\\teg_gnn_splitB_seed7_epochs50_teg_low_tail_10seed_floor_0p01"
+  ],
+  "weights": [
+    0.25,
+    0.75
+  ],
+  "ensemble": "mean node probabilities",
+  "summaries": [
+    {
+      "year": "data_2020",
+      "edge_count": 6603,
+      "risk_mean": 0.021297846764786223,
+      "risk_p95": 0.1190668422434799,
+      "risk_p99": 0.43126483789326736,
+      "risk_max": 0.8572906598949565
+    },
+    {
+      "year": "data_2021",
+      "edge_count": 7647,
+      "risk_mean": 0.01916928258094331,
+      "risk_p95": 0.11009871214212606,
+      "risk_p99": 0.4254333472222085,
+      "risk_max": 0.8573819114493271
+    }
+  ]
+}

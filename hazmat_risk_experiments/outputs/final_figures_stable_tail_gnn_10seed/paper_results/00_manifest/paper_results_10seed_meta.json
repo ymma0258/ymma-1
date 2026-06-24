@@ -1,0 +1,31 @@
+{
+  "seed_count": 10,
+  "model_seeds": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9
+  ],
+  "pyvrp_seeds": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9
+  ],
+  "outputs_root": "D:\\PyVRP-main\\hazmat_risk_experiments\\outputs_10seed",
+  "final_root": "D:\\PyVRP-main\\hazmat_risk_experiments\\outputs\\final_figures_stable_tail_gnn_10seed",
+  "risk_mode": "floor_0.01",
+  "note": "10seed package generated without modifying 5seed outputs."
+}

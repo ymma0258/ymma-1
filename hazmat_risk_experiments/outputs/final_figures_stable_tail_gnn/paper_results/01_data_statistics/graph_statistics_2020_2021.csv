@@ -1,3 +1,0 @@
-year,node_count,edge_count,feature_dim,labeled_count,unlabeled_count,high_risk_count_6_8,largest_weak_component,weak_component_count,largest_strong_component,strong_component_count,directed_edge_count,undirected_edge_count_max_merge,reciprocal_directed_edge_count,self_loop_count
-data_2020,4696,7048,715,419,4277,40,3706,192,2324,1661,7048,6603,890,0
-data_2021,5261,8115,715,443,4818,51,4357,161,2823,1667,8115,7647,936,0

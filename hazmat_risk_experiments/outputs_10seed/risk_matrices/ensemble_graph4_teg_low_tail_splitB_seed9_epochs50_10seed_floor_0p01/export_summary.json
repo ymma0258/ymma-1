@@ -1,0 +1,34 @@
+{
+  "name": "ensemble_graph4_teg_low_tail_splitB_seed9_epochs50_10seed_floor_0p01",
+  "risk_dirs": [
+    "D:\\PyVRP-main\\hazmat_risk_experiments\\outputs_10seed\\risk_matrices\\gcn_splitB_seed9_epochs50_10seed_floor_0p01",
+    "D:\\PyVRP-main\\hazmat_risk_experiments\\outputs_10seed\\risk_matrices\\weighted_gcn_splitB_seed9_epochs50_10seed_floor_0p01",
+    "D:\\PyVRP-main\\hazmat_risk_experiments\\outputs_10seed\\risk_matrices\\edge_gat_splitB_seed9_epochs50_10seed_floor_0p01",
+    "D:\\PyVRP-main\\hazmat_risk_experiments\\outputs_10seed\\risk_matrices\\teg_gnn_splitB_seed9_epochs50_teg_low_tail_10seed_floor_0p01"
+  ],
+  "weights": [
+    0.25,
+    0.25,
+    0.25,
+    0.25
+  ],
+  "ensemble": "mean node probabilities",
+  "summaries": [
+    {
+      "year": "data_2020",
+      "edge_count": 6603,
+      "risk_mean": 0.020269113647627807,
+      "risk_p95": 0.1062039213190898,
+      "risk_p99": 0.4320015536485369,
+      "risk_max": 0.9288905471829432
+    },
+    {
+      "year": "data_2021",
+      "edge_count": 7647,
+      "risk_mean": 0.017676921168690653,
+      "risk_p95": 0.09464815368779779,
+      "risk_p99": 0.40822355263982835,
+      "risk_max": 0.8546961896119547
+    }
+  ]
+}

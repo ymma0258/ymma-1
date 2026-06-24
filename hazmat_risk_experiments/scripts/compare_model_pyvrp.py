@@ -30,6 +30,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--output-dir", type=Path, default=DEFAULT_OUTPUT)
     parser.add_argument("--meta-a", type=Path, default=DEFAULT_META_A)
     parser.add_argument("--meta-b", type=Path, default=DEFAULT_META_B)
+    parser.add_argument("--customer-sets", default="A,B")
     parser.add_argument("--betas", default="0,1.0")
     parser.add_argument("--lambda-concentration", default="0")
     parser.add_argument("--concentration-threshold", choices=["mean", "p75", "p90"], default="p75")
@@ -98,6 +99,8 @@ def run_one(
         sys.executable,
         "-B",
         str(PYVRP_SCRIPT),
+        "--output-dir",
+        str(args.output_dir),
         "--risk-dir",
         str(risk_dir),
         "--year",
@@ -157,10 +160,14 @@ def main() -> None:
     out_dir = args.output_dir / args.batch_name
     out_dir.mkdir(parents=True, exist_ok=True)
 
+    customer_sets = [item.strip().upper() for item in args.customer_sets.split(",") if item.strip()]
+    meta_by_set = {"A": args.meta_a, "B": args.meta_b}
+
     all_rows: list[dict[str, object]] = []
     failures: list[dict[str, object]] = []
     for label, risk_dir in args.risk_dirs:
-        for customer_set, meta_path in [("A", args.meta_a), ("B", args.meta_b)]:
+        for customer_set in customer_sets:
+            meta_path = meta_by_set[customer_set]
             print(f"[pyvrp] source={label} set={customer_set}")
             rows, failure = run_one(label, risk_dir, customer_set, meta_path, args)
             all_rows.extend(rows)

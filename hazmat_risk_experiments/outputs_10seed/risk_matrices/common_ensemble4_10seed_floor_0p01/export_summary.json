@@ -1,0 +1,46 @@
+{
+  "name": "common_ensemble4_10seed_floor_0p01",
+  "risk_dirs": [
+    "D:\\PyVRP-main\\hazmat_risk_experiments\\outputs_10seed\\risk_matrices\\ensemble_graph4_teg_low_tail_splitB_seed0_epochs50_10seed_floor_0p01",
+    "D:\\PyVRP-main\\hazmat_risk_experiments\\outputs_10seed\\risk_matrices\\ensemble_graph4_teg_low_tail_splitB_seed1_epochs50_10seed_floor_0p01",
+    "D:\\PyVRP-main\\hazmat_risk_experiments\\outputs_10seed\\risk_matrices\\ensemble_graph4_teg_low_tail_splitB_seed2_epochs50_10seed_floor_0p01",
+    "D:\\PyVRP-main\\hazmat_risk_experiments\\outputs_10seed\\risk_matrices\\ensemble_graph4_teg_low_tail_splitB_seed3_epochs50_10seed_floor_0p01",
+    "D:\\PyVRP-main\\hazmat_risk_experiments\\outputs_10seed\\risk_matrices\\ensemble_graph4_teg_low_tail_splitB_seed4_epochs50_10seed_floor_0p01",
+    "D:\\PyVRP-main\\hazmat_risk_experiments\\outputs_10seed\\risk_matrices\\ensemble_graph4_teg_low_tail_splitB_seed5_epochs50_10seed_floor_0p01",
+    "D:\\PyVRP-main\\hazmat_risk_experiments\\outputs_10seed\\risk_matrices\\ensemble_graph4_teg_low_tail_splitB_seed6_epochs50_10seed_floor_0p01",
+    "D:\\PyVRP-main\\hazmat_risk_experiments\\outputs_10seed\\risk_matrices\\ensemble_graph4_teg_low_tail_splitB_seed7_epochs50_10seed_floor_0p01",
+    "D:\\PyVRP-main\\hazmat_risk_experiments\\outputs_10seed\\risk_matrices\\ensemble_graph4_teg_low_tail_splitB_seed8_epochs50_10seed_floor_0p01",
+    "D:\\PyVRP-main\\hazmat_risk_experiments\\outputs_10seed\\risk_matrices\\ensemble_graph4_teg_low_tail_splitB_seed9_epochs50_10seed_floor_0p01"
+  ],
+  "weights": [
+    0.1,
+    0.1,
+    0.1,
+    0.1,
+    0.1,
+    0.1,
+    0.1,
+    0.1,
+    0.1,
+    0.1
+  ],
+  "ensemble": "mean node probabilities",
+  "summaries": [
+    {
+      "year": "data_2020",
+      "edge_count": 6603,
+      "risk_mean": 0.020375922625460192,
+      "risk_p95": 0.11080262516543651,
+      "risk_p99": 0.43187073078955907,
+      "risk_max": 0.8952450711928448
+    },
+    {
+      "year": "data_2021",
+      "edge_count": 7647,
+      "risk_mean": 0.01776725374562453,
+      "risk_p95": 0.1040356083361245,
+      "risk_p99": 0.4120524768489955,
+      "risk_max": 0.8497501577930704
+    }
+  ]
+}
