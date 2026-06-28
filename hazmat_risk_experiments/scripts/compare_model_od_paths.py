@@ -16,11 +16,9 @@ if str(SCRIPT_DIR) not in sys.path:
 import validate_od_paths  # noqa: E402
 
 
-DEFAULT_OUTPUT = Path(r"D:\PyVRP-main\hazmat_risk_experiments\outputs\od_paths")
-DEFAULT_PAIRS = Path(
-    r"D:\PyVRP-main\hazmat_risk_experiments\outputs\od_paths"
-    r"\od_formal_floor001_p50_k50_cached_floor_0p01_a0p9_l1_p75\od_pairs.csv"
-)
+ROOT = SCRIPT_DIR.parent
+DEFAULT_OUTPUT = ROOT / "outputs_10seed" / "od_paths"
+DEFAULT_PAIRS = DEFAULT_OUTPUT / "fixed_od_pairs_150.csv"
 
 
 def parse_label_dir(value: str) -> tuple[str, Path]:
@@ -44,6 +42,11 @@ def parse_args() -> argparse.Namespace:
 
 
 def read_pairs(path: Path) -> list[dict[str, int | str]]:
+    if not path.exists():
+        raise FileNotFoundError(
+            f"OD pair file not found: {path}. For 10seed runs, create it via "
+            "run_10seed_pipeline.py or pass --pairs explicitly."
+        )
     with path.open(newline="", encoding="utf-8") as handle:
         rows = list(csv.DictReader(handle))
     pairs: list[dict[str, int | str]] = []

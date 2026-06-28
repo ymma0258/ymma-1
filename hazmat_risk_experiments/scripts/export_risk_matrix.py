@@ -49,6 +49,10 @@ def parse_args() -> argparse.Namespace:
             "gcn_teg_concat",
             "gcn_teg_residual_fixed",
             "gcn_teg_residual_learnable",
+            "ua_gnn",
+            "ua_teg_gnn",
+            "stable_tail_ua_gnn",
+            "stable_tail_ec_gnn",
         ],
     )
     parser.add_argument("--split", default="B", choices=["A", "B", "C"])
@@ -68,6 +72,23 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--alpha-ord", type=float, default=0.5)
     parser.add_argument("--alpha-hr", type=float, default=1.0)
     parser.add_argument("--alpha-topk", type=float, default=0.3)
+    parser.add_argument("--lambda-nll", type=float, default=0.0)
+    parser.add_argument("--lambda-var", type=float, default=0.0)
+    parser.add_argument("--ec-delta-max", type=float, default=0.05)
+    parser.add_argument("--lambda-edge", type=float, default=0.0)
+    parser.add_argument("--lambda-edge-high", type=float, default=0.0)
+    parser.add_argument("--lambda-distill", type=float, default=0.0)
+    parser.add_argument("--lambda-delta", type=float, default=0.0)
+    parser.add_argument("--ec-teacher-epochs", type=int, default=50)
+    parser.add_argument("--gamma-unc", type=float, default=0.5)
+    parser.add_argument("--logvar-min", type=float, default=-5.0)
+    parser.add_argument("--logvar-max", type=float, default=2.0)
+    parser.add_argument(
+        "--uncertainty-tau",
+        type=float,
+        default=0.0,
+        help="Use S_norm + tau * sigma_norm for uncertainty-aware robust risk.",
+    )
     parser.add_argument("--stage1-epochs", type=int, default=0)
     parser.add_argument("--experiment-tag", default="")
     return parser.parse_args()
@@ -83,8 +104,16 @@ def fit_model(args: argparse.Namespace) -> tuple[dict[str, object], train_risk_m
 
     graphs = [graph20, graph21]
     split_map = train_risk_model.build_splits(graph20, graph21, args.split, args.seed)
-    model = train_risk_model.RiskModel(args.model, graph20.x.shape[1], args.hidden_dim, args.dropout)
-    optimizer = torch.optim.AdamW(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
+    model = train_risk_model.RiskModel(
+        args.model,
+        graph20.x.shape[1],
+        args.hidden_dim,
+        args.dropout,
+        getattr(args, "gamma_unc", 0.5),
+        getattr(args, "logvar_min", -5.0),
+        getattr(args, "logvar_max", 2.0),
+        getattr(args, "ec_delta_max", 0.05),
+    )
     weights = train_risk_model.class_weights(graphs, split_map)
 
     train_labels: list[int] = []
@@ -97,23 +126,87 @@ def fit_model(args: argparse.Namespace) -> tuple[dict[str, object], train_risk_m
     high_neg = sum(1 for label in train_labels if 0 < label < 6)
     pos_weight = min(high_neg / max(high_pos, 1), 5.0)
 
+    teacher: train_risk_model.RiskModel | None = None
+    if args.model == "stable_tail_ec_gnn" and args.lambda_distill > 0:
+        teacher = train_risk_model.train_stable_tail_teacher(
+            args, graphs, split_map, weights, pos_weight
+        )
+
+    if args.model == "stable_tail_ec_gnn":
+        cal_params = list(model.calibration_head.parameters())
+        cal_ids = {id(param) for param in cal_params}
+        backbone_params = [
+            param for param in model.parameters() if id(param) not in cal_ids
+        ]
+        optimizer = torch.optim.AdamW(
+            [
+                {"params": backbone_params, "lr": args.lr},
+                {"params": cal_params, "lr": args.lr},
+            ],
+            weight_decay=args.weight_decay,
+        )
+    else:
+        optimizer = torch.optim.AdamW(
+            model.parameters(), lr=args.lr, weight_decay=args.weight_decay
+        )
+
     history: list[dict[str, float]] = []
     for epoch in range(args.epochs):
         model.train()
         optimizer.zero_grad()
         total_loss = torch.tensor(0.0)
         full_loss = epoch >= args.stage1_epochs
+        if args.model == "stable_tail_ec_gnn":
+            optimizer.param_groups[0]["lr"] = args.lr * (0.4 if full_loss else 1.0)
+            optimizer.param_groups[1]["lr"] = args.lr
         for graph in graphs:
-            logits = model(graph)
-            total_loss = total_loss + train_risk_model.compute_loss(
-                logits,
-                graph.y,
-                split_map[graph.year]["train"],
-                weights,
-                args,
-                full_loss,
-                pos_weight,
-            )
+            if args.model == "stable_tail_ec_gnn":
+                logits, _base_norm, calibrated_norm, delta, probs = model.forward_ec_outputs(graph)
+                loss = train_risk_model.compute_loss(
+                    logits,
+                    None,
+                    graph.y,
+                    split_map[graph.year]["train"],
+                    weights,
+                    args,
+                    full_loss,
+                    pos_weight,
+                )
+                if teacher is not None:
+                    with torch.no_grad():
+                        teacher_logits, _teacher_log_var = teacher.forward_outputs(graph)
+                    loss = loss + args.lambda_distill * train_risk_model.compute_distill_loss(
+                        logits,
+                        teacher_logits,
+                        split_map[graph.year]["train"],
+                    )
+                if full_loss:
+                    edge_loss, edge_high = train_risk_model.compute_edge_calibration_loss(
+                        graph,
+                        split_map[graph.year]["train"],
+                        calibrated_norm,
+                        probs,
+                        pos_weight,
+                    )
+                    loss = (
+                        loss
+                        + args.lambda_edge * edge_loss
+                        + args.lambda_edge_high * edge_high
+                        + args.lambda_delta * delta.pow(2).mean()
+                    )
+                total_loss = total_loss + loss
+            else:
+                logits, log_var = model.forward_outputs(graph)
+                total_loss = total_loss + train_risk_model.compute_loss(
+                    logits,
+                    log_var,
+                    graph.y,
+                    split_map[graph.year]["train"],
+                    weights,
+                    args,
+                    full_loss,
+                    pos_weight,
+                )
         total_loss.backward()
         optimizer.step()
         history.append({"epoch": epoch + 1, "loss": float(total_loss.detach())})
@@ -122,10 +215,10 @@ def fit_model(args: argparse.Namespace) -> tuple[dict[str, object], train_risk_m
     metrics: dict[str, dict[str, float]] = {}
     with torch.no_grad():
         for graph in graphs:
-            logits = model(graph)
+            logits, log_var = model.forward_outputs(graph)
             for split_name in ("train", "val", "test"):
                 idx = split_map[graph.year][split_name]
-                result = train_risk_model.evaluate(logits, graph.y, idx)
+                result = train_risk_model.evaluate(logits, graph.y, idx, log_var)
                 if result:
                     metrics[f"{graph.year}_{split_name}"] = result
 
@@ -135,6 +228,18 @@ def fit_model(args: argparse.Namespace) -> tuple[dict[str, object], train_risk_m
         "seed": args.seed,
         "epochs": args.epochs,
         "pos_weight": pos_weight,
+        "lambda_nll": args.lambda_nll,
+        "lambda_var": args.lambda_var,
+        "ec_delta_max": args.ec_delta_max,
+        "lambda_edge": args.lambda_edge,
+        "lambda_edge_high": args.lambda_edge_high,
+        "lambda_distill": args.lambda_distill,
+        "lambda_delta": args.lambda_delta,
+        "ec_teacher_epochs": args.ec_teacher_epochs,
+        "gamma_unc": getattr(args, "gamma_unc", 0.5),
+        "logvar_min": getattr(args, "logvar_min", -5.0),
+        "logvar_max": getattr(args, "logvar_max", 2.0),
+        "uncertainty_tau": args.uncertainty_tau,
         "history": history,
         "metrics": metrics,
         "split_sizes": {
@@ -173,26 +278,51 @@ def unique_undirected_edges(graph: train_risk_model.GraphData) -> tuple[np.ndarr
 
 def node_predictions(model: train_risk_model.RiskModel, graph: train_risk_model.GraphData) -> dict[str, np.ndarray]:
     with torch.no_grad():
-        logits = model(graph)
+        if model.model == "stable_tail_ec_gnn":
+            logits, base_norm_t, calibrated_norm_t, delta_t, _probs_t = model.forward_ec_outputs(graph)
+            log_var = None
+            calibrated_norm = calibrated_norm_t.cpu().numpy()
+            delta = delta_t.cpu().numpy()
+        else:
+            logits, log_var = model.forward_outputs(graph)
+            calibrated_norm = None
+            delta = None
         probs = F.softmax(logits, dim=1).cpu().numpy()
     levels = np.arange(1, train_risk_model.NUM_CLASSES + 1, dtype=np.float32)
     scores = probs @ levels
     scores_norm = (scores - 1.0) / 7.0
     p_high = probs[:, 5:].sum(axis=1)
     pred_label = np.argmax(probs, axis=1) + 1
-    return {
+    pred = {
         "probs": probs,
         "scores": scores,
         "scores_norm": np.clip(scores_norm, 0.0, 1.0),
         "p_high": p_high,
         "pred_label": pred_label.astype(np.int64),
     }
+    if calibrated_norm is not None:
+        pred["scores_ec_norm"] = calibrated_norm
+        pred["delta_ec"] = delta
+    if log_var is not None:
+        sigma = np.sqrt(np.exp(log_var.cpu().numpy()))
+        sigma_min = float(np.min(sigma))
+        sigma_max = float(np.max(sigma))
+        pred["sigma"] = sigma
+        pred["sigma_norm"] = np.clip(
+            (sigma - sigma_min) / (sigma_max - sigma_min + EPS), 0.0, 1.0
+        )
+    return pred
 
 
 def write_node_csv(path: Path, labels: np.ndarray, pred: dict[str, np.ndarray]) -> None:
     probs = pred["probs"]
     with path.open("w", newline="", encoding="utf-8") as handle:
-        fields = ["node_id", "label", "pred_label", "S_i", "S_i_norm", "P_high"] + [
+        fields = ["node_id", "label", "pred_label", "S_i", "S_i_norm", "P_high"]
+        if "scores_ec_norm" in pred:
+            fields += ["S_i_ec_norm", "delta_ec"]
+        if "sigma" in pred:
+            fields += ["sigma", "sigma_norm"]
+        fields += [
             f"p_{idx}" for idx in range(1, train_risk_model.NUM_CLASSES + 1)
         ]
         writer = csv.DictWriter(handle, fieldnames=fields)
@@ -206,6 +336,12 @@ def write_node_csv(path: Path, labels: np.ndarray, pred: dict[str, np.ndarray]) 
                 "S_i_norm": float(pred["scores_norm"][node_id]),
                 "P_high": float(pred["p_high"][node_id]),
             }
+            if "scores_ec_norm" in pred:
+                row["S_i_ec_norm"] = float(pred["scores_ec_norm"][node_id])
+                row["delta_ec"] = float(pred["delta_ec"][node_id])
+            if "sigma" in pred:
+                row["sigma"] = float(pred["sigma"][node_id])
+                row["sigma_norm"] = float(pred["sigma_norm"][node_id])
             for cls_idx in range(train_risk_model.NUM_CLASSES):
                 row[f"p_{cls_idx + 1}"] = float(probs[node_id, cls_idx])
             writer.writerow(row)
@@ -216,6 +352,7 @@ def build_edge_risk(
     pred: dict[str, np.ndarray],
     risk_mode: str,
     exposure_delta: float,
+    uncertainty_tau: float,
 ) -> dict[str, np.ndarray]:
     edge_ids, edges, weights = unique_undirected_edges(graph)
     raw_weights = weights.copy()
@@ -234,7 +371,13 @@ def build_edge_risk(
     src = edges[:, 0]
     dst = edges[:, 1]
     severity_cont = np.maximum(pred["scores"][src], pred["scores"][dst])
-    severity_norm = np.maximum(pred["scores_norm"][src], pred["scores_norm"][dst])
+    base_norm = pred.get("scores_ec_norm", pred["scores_norm"])
+    cls_norm = pred["scores_norm"]
+    if uncertainty_tau > 0 and "sigma_norm" in pred:
+        robust_norm = np.clip(base_norm + uncertainty_tau * pred["sigma_norm"], 0.0, 1.0)
+    else:
+        robust_norm = base_norm
+    severity_norm = np.maximum(robust_norm[src], robust_norm[dst])
     risk = weights * severity_norm
     p_level = quantile_levels(weights, 5)
     c_level = np.clip(np.ceil(severity_cont), 1, 8).astype(np.int64)
@@ -246,6 +389,7 @@ def build_edge_risk(
         "w_raw": raw_weights,
         "w_norm": weights,
         "severity": severity_cont,
+        "severity_norm_mean": np.maximum(cls_norm[src], cls_norm[dst]),
         "severity_norm": severity_norm,
         "R_ij": risk,
         "P_level": p_level,
@@ -262,6 +406,7 @@ def write_edge_csv(path: Path, edge: dict[str, np.ndarray]) -> None:
         "w_raw",
         "w_norm",
         "severity",
+        "severity_norm_mean",
         "severity_norm",
         "R_ij",
         "P_level",
@@ -408,6 +553,8 @@ def main() -> None:
         risk_suffix = f"floor_{args.exposure_delta:g}".replace(".", "p")
     else:
         risk_suffix = args.risk_mode
+    if args.uncertainty_tau > 0:
+        risk_suffix = f"{risk_suffix}_tau_{args.uncertainty_tau:g}".replace(".", "p")
     tag_suffix = f"_{args.experiment_tag}" if args.experiment_tag else ""
     model_dir_name = (
         f"{args.model}_split{args.split}_seed{args.seed}_epochs{args.epochs}{tag_suffix}_{risk_suffix}"
@@ -419,17 +566,29 @@ def main() -> None:
     for graph in graphs:
         labels = graph.y.numpy().astype(np.int64)
         pred = node_predictions(model, graph)
-        edge = build_edge_risk(graph, pred, args.risk_mode, args.exposure_delta)
+        edge = build_edge_risk(
+            graph,
+            pred,
+            args.risk_mode,
+            args.exposure_delta,
+            args.uncertainty_tau,
+        )
         mat = matrix_5x8(edge)
 
+        node_payload = {
+            "probs": pred["probs"],
+            "scores": pred["scores"],
+            "scores_norm": pred["scores_norm"],
+            "p_high": pred["p_high"],
+            "pred_label": pred["pred_label"],
+            "labels": labels,
+        }
+        if "sigma" in pred:
+            node_payload["sigma"] = pred["sigma"]
+            node_payload["sigma_norm"] = pred["sigma_norm"]
         np.savez(
             out_dir / f"{graph.year}_node_risk.npz",
-            probs=pred["probs"],
-            scores=pred["scores"],
-            scores_norm=pred["scores_norm"],
-            p_high=pred["p_high"],
-            pred_label=pred["pred_label"],
-            labels=labels,
+            **node_payload,
         )
         np.savez(out_dir / f"{graph.year}_edge_risk.npz", **edge)
         write_node_csv(out_dir / f"{graph.year}_node_risk.csv", labels, pred)
@@ -446,10 +605,22 @@ def main() -> None:
         "epochs": args.epochs,
         "risk_mode": args.risk_mode,
         "exposure_delta": args.exposure_delta,
+        "uncertainty_tau": args.uncertainty_tau,
         "experiment_tag": args.experiment_tag,
         "alpha_ord": args.alpha_ord,
         "alpha_hr": args.alpha_hr,
         "alpha_topk": args.alpha_topk,
+        "lambda_nll": args.lambda_nll,
+        "lambda_var": args.lambda_var,
+        "ec_delta_max": args.ec_delta_max,
+        "lambda_edge": args.lambda_edge,
+        "lambda_edge_high": args.lambda_edge_high,
+        "lambda_distill": args.lambda_distill,
+        "lambda_delta": args.lambda_delta,
+        "ec_teacher_epochs": args.ec_teacher_epochs,
+        "gamma_unc": args.gamma_unc,
+        "logvar_min": args.logvar_min,
+        "logvar_max": args.logvar_max,
         "metrics": result["metrics"],
         "split_sizes": result["split_sizes"],
         "risk_summaries": risk_summaries,

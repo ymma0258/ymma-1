@@ -1,0 +1,26 @@
+{
+  "name": "stable_tail_eta0p3_splitB_seed3_10seed_floor_0p01",
+  "base_risk_dir": "D:\\PyVRP-main\\hazmat_risk_experiments\\outputs_10seed\\risk_matrices\\gcn_teg_concat_splitB_seed3_epochs50_10seed_floor_0p01",
+  "eta": 0.3,
+  "definition": "S_tail = clip(S_norm + eta * P_high, 0, 1)",
+  "summaries": [
+    {
+      "year": "data_2020",
+      "eta": 0.3,
+      "edge_count": 6603,
+      "risk_mean": 0.021017257124185562,
+      "risk_p95": 0.08007930219173431,
+      "risk_p99": 0.5049999952316284,
+      "risk_max": 1.0
+    },
+    {
+      "year": "data_2021",
+      "eta": 0.3,
+      "edge_count": 7647,
+      "risk_mean": 0.01722540706396103,
+      "risk_p95": 0.06250864267349243,
+      "risk_p99": 0.4582061469554901,
+      "risk_max": 0.9999998807907104
+    }
+  ]
+}

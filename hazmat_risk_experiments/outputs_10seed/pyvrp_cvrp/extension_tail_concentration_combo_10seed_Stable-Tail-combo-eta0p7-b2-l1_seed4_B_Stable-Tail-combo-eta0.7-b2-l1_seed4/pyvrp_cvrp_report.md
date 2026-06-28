@@ -1,0 +1,14 @@
+# PyVRP-CVRP Downstream Validation Report
+
+- Year: `data_2021`
+- Customers: `50`
+- Vehicles: `5`
+- Capacity: `10`
+- Customer set: `B`
+
+| beta | lambda | Cost | Cost inc. | Global risk | Risk red. | CVaR90 | Max vehicle risk | Vehicle Gini | Edge burden Gini | Top10 burden share |
+|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| 0 | 0 | 146730.9 | 0.000% | 9.275491 | 0.000% | 0.291917 | 3.021439 | 0.209019 | 0.877111 | 89.848% |
+| 2 | 1 | 211210.4 | 43.944% | 2.846707 | 69.309% | 0.054287 | 1.199790 | 0.329231 | 0.778511 | 72.992% |
+
+PyVRP is used only as a CVRP solver. Risk and fairness metrics are posterior evaluations of the returned routes.

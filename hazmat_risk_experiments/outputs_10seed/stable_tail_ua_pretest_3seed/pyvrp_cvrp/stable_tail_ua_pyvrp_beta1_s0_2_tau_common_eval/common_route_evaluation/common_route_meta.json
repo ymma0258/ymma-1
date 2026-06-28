@@ -1,0 +1,28 @@
+{
+  "common_risk_dir": "hazmat_risk_experiments\\outputs_10seed\\risk_matrices\\common_ensemble4_10seed_floor_0p01",
+  "betas": [
+    0.0,
+    1.0
+  ],
+  "lambda_concentration": null,
+  "run_dirs": {
+    "A_stable_tail_ua_gnn_tau0_seed0": "hazmat_risk_experiments\\outputs_10seed\\stable_tail_ua_pretest_3seed\\pyvrp_cvrp\\stable_tail_ua_pyvrp_beta1_s0_2_tau_A_stable_tail_ua_gnn_tau0_seed0",
+    "B_stable_tail_ua_gnn_tau0_seed0": "hazmat_risk_experiments\\outputs_10seed\\stable_tail_ua_pretest_3seed\\pyvrp_cvrp\\stable_tail_ua_pyvrp_beta1_s0_2_tau_B_stable_tail_ua_gnn_tau0_seed0",
+    "A_stable_tail_ua_gnn_tau0p25_seed0": "hazmat_risk_experiments\\outputs_10seed\\stable_tail_ua_pretest_3seed\\pyvrp_cvrp\\stable_tail_ua_pyvrp_beta1_s0_2_tau_A_stable_tail_ua_gnn_tau0p25_seed0",
+    "B_stable_tail_ua_gnn_tau0p25_seed0": "hazmat_risk_experiments\\outputs_10seed\\stable_tail_ua_pretest_3seed\\pyvrp_cvrp\\stable_tail_ua_pyvrp_beta1_s0_2_tau_B_stable_tail_ua_gnn_tau0p25_seed0",
+    "A_stable_tail_ua_gnn_tau0p5_seed0": "hazmat_risk_experiments\\outputs_10seed\\stable_tail_ua_pretest_3seed\\pyvrp_cvrp\\stable_tail_ua_pyvrp_beta1_s0_2_tau_A_stable_tail_ua_gnn_tau0p5_seed0",
+    "B_stable_tail_ua_gnn_tau0p5_seed0": "hazmat_risk_experiments\\outputs_10seed\\stable_tail_ua_pretest_3seed\\pyvrp_cvrp\\stable_tail_ua_pyvrp_beta1_s0_2_tau_B_stable_tail_ua_gnn_tau0p5_seed0",
+    "A_stable_tail_ua_gnn_tau0_seed1": "hazmat_risk_experiments\\outputs_10seed\\stable_tail_ua_pretest_3seed\\pyvrp_cvrp\\stable_tail_ua_pyvrp_beta1_s0_2_tau_A_stable_tail_ua_gnn_tau0_seed1",
+    "B_stable_tail_ua_gnn_tau0_seed1": "hazmat_risk_experiments\\outputs_10seed\\stable_tail_ua_pretest_3seed\\pyvrp_cvrp\\stable_tail_ua_pyvrp_beta1_s0_2_tau_B_stable_tail_ua_gnn_tau0_seed1",
+    "A_stable_tail_ua_gnn_tau0p25_seed1": "hazmat_risk_experiments\\outputs_10seed\\stable_tail_ua_pretest_3seed\\pyvrp_cvrp\\stable_tail_ua_pyvrp_beta1_s0_2_tau_A_stable_tail_ua_gnn_tau0p25_seed1",
+    "B_stable_tail_ua_gnn_tau0p25_seed1": "hazmat_risk_experiments\\outputs_10seed\\stable_tail_ua_pretest_3seed\\pyvrp_cvrp\\stable_tail_ua_pyvrp_beta1_s0_2_tau_B_stable_tail_ua_gnn_tau0p25_seed1",
+    "A_stable_tail_ua_gnn_tau0p5_seed1": "hazmat_risk_experiments\\outputs_10seed\\stable_tail_ua_pretest_3seed\\pyvrp_cvrp\\stable_tail_ua_pyvrp_beta1_s0_2_tau_A_stable_tail_ua_gnn_tau0p5_seed1",
+    "B_stable_tail_ua_gnn_tau0p5_seed1": "hazmat_risk_experiments\\outputs_10seed\\stable_tail_ua_pretest_3seed\\pyvrp_cvrp\\stable_tail_ua_pyvrp_beta1_s0_2_tau_B_stable_tail_ua_gnn_tau0p5_seed1",
+    "A_stable_tail_ua_gnn_tau0_seed2": "hazmat_risk_experiments\\outputs_10seed\\stable_tail_ua_pretest_3seed\\pyvrp_cvrp\\stable_tail_ua_pyvrp_beta1_s0_2_tau_A_stable_tail_ua_gnn_tau0_seed2",
+    "B_stable_tail_ua_gnn_tau0_seed2": "hazmat_risk_experiments\\outputs_10seed\\stable_tail_ua_pretest_3seed\\pyvrp_cvrp\\stable_tail_ua_pyvrp_beta1_s0_2_tau_B_stable_tail_ua_gnn_tau0_seed2",
+    "A_stable_tail_ua_gnn_tau0p25_seed2": "hazmat_risk_experiments\\outputs_10seed\\stable_tail_ua_pretest_3seed\\pyvrp_cvrp\\stable_tail_ua_pyvrp_beta1_s0_2_tau_A_stable_tail_ua_gnn_tau0p25_seed2",
+    "B_stable_tail_ua_gnn_tau0p25_seed2": "hazmat_risk_experiments\\outputs_10seed\\stable_tail_ua_pretest_3seed\\pyvrp_cvrp\\stable_tail_ua_pyvrp_beta1_s0_2_tau_B_stable_tail_ua_gnn_tau0p25_seed2",
+    "A_stable_tail_ua_gnn_tau0p5_seed2": "hazmat_risk_experiments\\outputs_10seed\\stable_tail_ua_pretest_3seed\\pyvrp_cvrp\\stable_tail_ua_pyvrp_beta1_s0_2_tau_A_stable_tail_ua_gnn_tau0p5_seed2",
+    "B_stable_tail_ua_gnn_tau0p5_seed2": "hazmat_risk_experiments\\outputs_10seed\\stable_tail_ua_pretest_3seed\\pyvrp_cvrp\\stable_tail_ua_pyvrp_beta1_s0_2_tau_B_stable_tail_ua_gnn_tau0p5_seed2"
+  }
+}

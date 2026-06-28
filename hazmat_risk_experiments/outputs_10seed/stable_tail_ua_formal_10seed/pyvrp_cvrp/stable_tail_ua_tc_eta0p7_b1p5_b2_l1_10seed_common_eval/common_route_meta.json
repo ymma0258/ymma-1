@@ -1,0 +1,31 @@
+{
+  "common_risk_dir": "hazmat_risk_experiments\\outputs_10seed\\risk_matrices\\common_ensemble4_10seed_floor_0p01",
+  "betas": [
+    0.0,
+    1.5,
+    2.0
+  ],
+  "lambda_concentration": null,
+  "run_dirs": {
+    "A_Stable-Tail-UA-TC-eta0p7_seed0": "hazmat_risk_experiments\\outputs_10seed\\stable_tail_ua_formal_10seed\\pyvrp_cvrp\\stable_tail_ua_tc_eta0p7_b1p5_b2_l1_10seed_A_Stable-Tail-UA-TC-eta0p7_seed0",
+    "A_Stable-Tail-UA-TC-eta0p7_seed1": "hazmat_risk_experiments\\outputs_10seed\\stable_tail_ua_formal_10seed\\pyvrp_cvrp\\stable_tail_ua_tc_eta0p7_b1p5_b2_l1_10seed_A_Stable-Tail-UA-TC-eta0p7_seed1",
+    "A_Stable-Tail-UA-TC-eta0p7_seed2": "hazmat_risk_experiments\\outputs_10seed\\stable_tail_ua_formal_10seed\\pyvrp_cvrp\\stable_tail_ua_tc_eta0p7_b1p5_b2_l1_10seed_A_Stable-Tail-UA-TC-eta0p7_seed2",
+    "A_Stable-Tail-UA-TC-eta0p7_seed3": "hazmat_risk_experiments\\outputs_10seed\\stable_tail_ua_formal_10seed\\pyvrp_cvrp\\stable_tail_ua_tc_eta0p7_b1p5_b2_l1_10seed_A_Stable-Tail-UA-TC-eta0p7_seed3",
+    "A_Stable-Tail-UA-TC-eta0p7_seed4": "hazmat_risk_experiments\\outputs_10seed\\stable_tail_ua_formal_10seed\\pyvrp_cvrp\\stable_tail_ua_tc_eta0p7_b1p5_b2_l1_10seed_A_Stable-Tail-UA-TC-eta0p7_seed4",
+    "A_Stable-Tail-UA-TC-eta0p7_seed5": "hazmat_risk_experiments\\outputs_10seed\\stable_tail_ua_formal_10seed\\pyvrp_cvrp\\stable_tail_ua_tc_eta0p7_b1p5_b2_l1_10seed_A_Stable-Tail-UA-TC-eta0p7_seed5",
+    "A_Stable-Tail-UA-TC-eta0p7_seed6": "hazmat_risk_experiments\\outputs_10seed\\stable_tail_ua_formal_10seed\\pyvrp_cvrp\\stable_tail_ua_tc_eta0p7_b1p5_b2_l1_10seed_A_Stable-Tail-UA-TC-eta0p7_seed6",
+    "A_Stable-Tail-UA-TC-eta0p7_seed7": "hazmat_risk_experiments\\outputs_10seed\\stable_tail_ua_formal_10seed\\pyvrp_cvrp\\stable_tail_ua_tc_eta0p7_b1p5_b2_l1_10seed_A_Stable-Tail-UA-TC-eta0p7_seed7",
+    "A_Stable-Tail-UA-TC-eta0p7_seed8": "hazmat_risk_experiments\\outputs_10seed\\stable_tail_ua_formal_10seed\\pyvrp_cvrp\\stable_tail_ua_tc_eta0p7_b1p5_b2_l1_10seed_A_Stable-Tail-UA-TC-eta0p7_seed8",
+    "A_Stable-Tail-UA-TC-eta0p7_seed9": "hazmat_risk_experiments\\outputs_10seed\\stable_tail_ua_formal_10seed\\pyvrp_cvrp\\stable_tail_ua_tc_eta0p7_b1p5_b2_l1_10seed_A_Stable-Tail-UA-TC-eta0p7_seed9",
+    "B_Stable-Tail-UA-TC-eta0p7_seed0": "hazmat_risk_experiments\\outputs_10seed\\stable_tail_ua_formal_10seed\\pyvrp_cvrp\\stable_tail_ua_tc_eta0p7_b1p5_b2_l1_10seed_B_Stable-Tail-UA-TC-eta0p7_seed0",
+    "B_Stable-Tail-UA-TC-eta0p7_seed1": "hazmat_risk_experiments\\outputs_10seed\\stable_tail_ua_formal_10seed\\pyvrp_cvrp\\stable_tail_ua_tc_eta0p7_b1p5_b2_l1_10seed_B_Stable-Tail-UA-TC-eta0p7_seed1",
+    "B_Stable-Tail-UA-TC-eta0p7_seed2": "hazmat_risk_experiments\\outputs_10seed\\stable_tail_ua_formal_10seed\\pyvrp_cvrp\\stable_tail_ua_tc_eta0p7_b1p5_b2_l1_10seed_B_Stable-Tail-UA-TC-eta0p7_seed2",
+    "B_Stable-Tail-UA-TC-eta0p7_seed3": "hazmat_risk_experiments\\outputs_10seed\\stable_tail_ua_formal_10seed\\pyvrp_cvrp\\stable_tail_ua_tc_eta0p7_b1p5_b2_l1_10seed_B_Stable-Tail-UA-TC-eta0p7_seed3",
+    "B_Stable-Tail-UA-TC-eta0p7_seed4": "hazmat_risk_experiments\\outputs_10seed\\stable_tail_ua_formal_10seed\\pyvrp_cvrp\\stable_tail_ua_tc_eta0p7_b1p5_b2_l1_10seed_B_Stable-Tail-UA-TC-eta0p7_seed4",
+    "B_Stable-Tail-UA-TC-eta0p7_seed5": "hazmat_risk_experiments\\outputs_10seed\\stable_tail_ua_formal_10seed\\pyvrp_cvrp\\stable_tail_ua_tc_eta0p7_b1p5_b2_l1_10seed_B_Stable-Tail-UA-TC-eta0p7_seed5",
+    "B_Stable-Tail-UA-TC-eta0p7_seed6": "hazmat_risk_experiments\\outputs_10seed\\stable_tail_ua_formal_10seed\\pyvrp_cvrp\\stable_tail_ua_tc_eta0p7_b1p5_b2_l1_10seed_B_Stable-Tail-UA-TC-eta0p7_seed6",
+    "B_Stable-Tail-UA-TC-eta0p7_seed7": "hazmat_risk_experiments\\outputs_10seed\\stable_tail_ua_formal_10seed\\pyvrp_cvrp\\stable_tail_ua_tc_eta0p7_b1p5_b2_l1_10seed_B_Stable-Tail-UA-TC-eta0p7_seed7",
+    "B_Stable-Tail-UA-TC-eta0p7_seed8": "hazmat_risk_experiments\\outputs_10seed\\stable_tail_ua_formal_10seed\\pyvrp_cvrp\\stable_tail_ua_tc_eta0p7_b1p5_b2_l1_10seed_B_Stable-Tail-UA-TC-eta0p7_seed8",
+    "B_Stable-Tail-UA-TC-eta0p7_seed9": "hazmat_risk_experiments\\outputs_10seed\\stable_tail_ua_formal_10seed\\pyvrp_cvrp\\stable_tail_ua_tc_eta0p7_b1p5_b2_l1_10seed_B_Stable-Tail-UA-TC-eta0p7_seed9"
+  }
+}

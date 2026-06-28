@@ -29,13 +29,28 @@ def parse_label_dir(value: str) -> tuple[str, Path]:
     return label.strip(), Path(path.strip())
 
 
+def parse_float_list(value: str) -> list[float]:
+    return [float(item.strip()) for item in value.split(",") if item.strip()]
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("run_dirs", nargs="+", type=parse_label_dir)
+    parser.add_argument("run_dirs", nargs="*", type=parse_label_dir)
+    parser.add_argument(
+        "--run-list",
+        type=Path,
+        default=None,
+        help="Optional CSV with label and run_dir columns. Appended to positional run dirs.",
+    )
     parser.add_argument("--common-risk-dir", type=Path, required=True)
     parser.add_argument("--output-dir", type=Path, default=DEFAULT_OUTPUT)
     parser.add_argument("--batch-name", default="common_route_evaluation")
     parser.add_argument("--beta", type=float, default=1.0)
+    parser.add_argument(
+        "--betas",
+        default=None,
+        help="Optional comma-separated beta filter. Overrides --beta when provided.",
+    )
     parser.add_argument(
         "--lambda-concentration",
         type=float,
@@ -62,6 +77,16 @@ def write_csv(path: Path, rows: list[dict[str, object]]) -> None:
         writer = csv.DictWriter(handle, fieldnames=fields)
         writer.writeheader()
         writer.writerows(rows)
+
+
+def load_run_sources(args: argparse.Namespace) -> list[tuple[str, Path]]:
+    sources: list[tuple[str, Path]] = list(args.run_dirs)
+    if args.run_list is not None:
+        for row in read_csv(args.run_list):
+            sources.append((row["label"], Path(row["run_dir"])))
+    if not sources:
+        raise ValueError("Provide at least one run dir or --run-list CSV.")
+    return sources
 
 
 def route_risks(graph, inst, seq: list[int]) -> np.ndarray:
@@ -184,12 +209,14 @@ def main() -> None:
     out_dir = args.output_dir / args.batch_name
     out_dir.mkdir(parents=True, exist_ok=True)
 
+    allowed_betas = parse_float_list(args.betas) if args.betas else [args.beta]
     graph, scores_norm, _ = pyvrp_eval.load_graph(args.common_risk_dir, "data_2021")
     graph = pyvrp_eval.largest_component(graph)
+    run_sources = load_run_sources(args)
 
     rows: list[dict[str, object]] = []
     failures: list[dict[str, object]] = []
-    for label, run_dir in args.run_dirs:
+    for label, run_dir in run_sources:
         meta = json.loads((run_dir / "pyvrp_cvrp_meta.json").read_text(encoding="utf-8"))
         try:
             inst = pyvrp_eval.build_instance(
@@ -204,7 +231,8 @@ def main() -> None:
                 [int(node) for node in meta["customers"]],
             )
             for row in read_csv(run_dir / "pyvrp_cvrp_detail.csv"):
-                if abs(float(row["beta"]) - args.beta) > 1e-9:
+                row_beta = float(row["beta"])
+                if all(abs(row_beta - beta) > 1e-9 for beta in allowed_betas):
                     continue
                 lambda_concentration = float(row.get("lambda_concentration", 0.0))
                 if (
@@ -218,7 +246,7 @@ def main() -> None:
                     {
                         "risk_source": label,
                         "customer_set": meta["customer_set"],
-                        "beta": float(row["beta"]),
+                        "beta": row_beta,
                         "lambda_concentration": lambda_concentration,
                         "seed": int(row["seed"]),
                         **metrics,
@@ -237,9 +265,9 @@ def main() -> None:
         json.dumps(
             {
                 "common_risk_dir": str(args.common_risk_dir),
-                "beta": args.beta,
+                "betas": allowed_betas,
                 "lambda_concentration": args.lambda_concentration,
-                "run_dirs": {label: str(path) for label, path in args.run_dirs},
+                "run_dirs": {label: str(path) for label, path in run_sources},
             },
             ensure_ascii=False,
             indent=2,

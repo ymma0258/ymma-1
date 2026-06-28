@@ -1,0 +1,8 @@
+# Extension Tail Concentration Combo Common
+
+| model | customer_set | beta | lambda_concentration | model_seeds | cost_increase_pct_mean | cost_increase_pct_std | common_risk_reduction_pct_mean | common_risk_reduction_pct_std | common_global_risk_mean | common_global_risk_std | common_global_cvar90_mean | common_global_cvar90_std | common_max_vehicle_risk_mean | common_max_vehicle_risk_std | common_edge_burden_gini_used_mean | common_edge_burden_gini_used_std | common_top10_burden_share_mean | common_top10_burden_share_std |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| Stable-Tail-combo-eta0.7-b1.5-l1 | A | 0.000000 | 0.000000 | 10 | 0.000000 | 0.000000 | 0.000000 | 0.000000 | 7.795773 | 0.000000 | 0.225367 | 0.000000 | 2.298988 | 0.000000 | 0.850443 | 0.000000 | 0.881526 | 0.000000 |
+| Stable-Tail-combo-eta0.7-b1.5-l1 | A | 1.500000 | 1.000000 | 10 | 0.307219 | 0.042444 | 0.685090 | 0.022345 | 2.454971 | 0.174193 | 0.043957 | 0.005629 | 0.882046 | 0.070278 | 0.688603 | 0.019185 | 0.668792 | 0.024405 |
+| Stable-Tail-combo-eta0.7-b1.5-l1 | B | 0.000000 | 0.000000 | 10 | 0.000000 | 0.000000 | 0.000000 | 0.000000 | 8.398098 | 0.000000 | 0.259186 | 0.000000 | 2.773631 | 0.000000 | 0.847754 | 0.000000 | 0.881309 | 0.000000 |
+| Stable-Tail-combo-eta0.7-b1.5-l1 | B | 1.500000 | 1.000000 | 10 | 0.362756 | 0.049869 | 0.623974 | 0.018700 | 3.157905 | 0.157048 | 0.068930 | 0.005297 | 1.110371 | 0.101267 | 0.736336 | 0.012320 | 0.721912 | 0.015868 |

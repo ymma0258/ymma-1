@@ -1,0 +1,89 @@
+{
+  "model": "ua_gnn",
+  "split": "A",
+  "seed": 0,
+  "epochs": 1,
+  "experiment_tag": "",
+  "alpha_ord": 0.3,
+  "alpha_hr": 0.5,
+  "alpha_topk": 0.1,
+  "lambda_nll": 0.2,
+  "lambda_var": 0.01,
+  "topk_frac": 0.2,
+  "stage1_epochs": 0,
+  "pos_weight": 5.0,
+  "history": [
+    {
+      "epoch": 1,
+      "loss": 4.0404229164123535
+    }
+  ],
+  "metrics": {
+    "data_2020_train": {
+      "macro_f1": 0.12545202291442892,
+      "weighted_f1": 0.3366401077320166,
+      "mae": 2.7332334910108003,
+      "qwk": 0.07198374701111676,
+      "recall_6_8": 0.16129032258064516,
+      "precision_6_8": 0.22727272727272727,
+      "pr_auc_high": 0.1503928548506384,
+      "high_fn_rate": 0.8387096774193549,
+      "brier": 0.8624402284622192,
+      "ece": 0.14345838374166345,
+      "ordinal_nll": 3.9290554161808853,
+      "uncertainty_mean": 1.066597580909729,
+      "correct_uncertainty": 1.0532314777374268,
+      "error_uncertainty": 1.071582555770874,
+      "error_uncertainty_corr": 0.0515643638910843,
+      "high_fn_uncertainty": 1.1218435764312744
+    },
+    "data_2020_val": {
+      "macro_f1": 0.13924800974434554,
+      "weighted_f1": 0.30282705869647913,
+      "mae": 2.7496228297684517,
+      "qwk": -0.0008894818768068191,
+      "recall_6_8": 0.2222222222222222,
+      "precision_6_8": 0.5,
+      "pr_auc_high": 0.3048415888048861,
+      "high_fn_rate": 0.7777777777777778,
+      "brier": 0.8661797642707825,
+      "ece": 0.15354303607628458,
+      "ordinal_nll": 3.9571542879635535,
+      "uncertainty_mean": 1.0757873058319092,
+      "correct_uncertainty": 1.053075909614563,
+      "error_uncertainty": 1.0838462114334106,
+      "error_uncertainty_corr": 0.08674570177659524,
+      "high_fn_uncertainty": 1.2203208208084106
+    },
+    "data_2021_test": {
+      "macro_f1": 0.18097750653743125,
+      "weighted_f1": 0.33981606056915514,
+      "mae": 2.7051999564124842,
+      "qwk": 0.052925466753101835,
+      "recall_6_8": 0.13725490196078433,
+      "precision_6_8": 0.25,
+      "pr_auc_high": 0.22615160001465495,
+      "high_fn_rate": 0.8627450980392157,
+      "brier": 0.8650422692298889,
+      "ece": 0.15650469293443667,
+      "ordinal_nll": 3.853464655931634,
+      "uncertainty_mean": 1.0661346912384033,
+      "correct_uncertainty": 1.0464526414871216,
+      "error_uncertainty": 1.0738712549209595,
+      "error_uncertainty_corr": 0.07129087958766757,
+      "high_fn_uncertainty": 1.0878925323486328
+    }
+  },
+  "split_sizes": {
+    "data_2020": {
+      "train": 335,
+      "val": 84,
+      "test": 0
+    },
+    "data_2021": {
+      "train": 0,
+      "val": 0,
+      "test": 443
+    }
+  }
+}

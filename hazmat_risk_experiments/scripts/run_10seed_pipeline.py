@@ -50,8 +50,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--max-runtime", type=float, default=10.0)
     parser.add_argument(
         "--stages",
-        default="models,risk,od,pyvrp,concentration,customer_sets",
-        help="Comma-separated stages: models,risk,od,pyvrp,concentration,customer_sets.",
+        default="models,node_tables,risk,od,pyvrp,concentration,customer_sets",
+        help=(
+            "Comma-separated stages: models,node_tables,risk,od,pyvrp,"
+            "concentration,customer_sets,consistency_checks."
+        ),
     )
     parser.add_argument("--dry-run", action="store_true")
     return parser.parse_args()
@@ -122,6 +125,54 @@ def pyvrp_root(outputs_root: Path) -> Path:
 
 def od_root(outputs_root: Path) -> Path:
     return outputs_root / "od_paths"
+
+
+def fixed_od_pairs_path(args: argparse.Namespace) -> Path:
+    return od_root(args.outputs_root) / "fixed_od_pairs_150.csv"
+
+
+def ensure_fixed_od_pairs(args: argparse.Namespace) -> Path:
+    """Keep the formal 150 OD pairs inside the 10seed output tree.
+
+    Earlier exploratory scripts defaulted to the old 5seed ``outputs`` tree.
+    The 10seed pipeline must be self-contained, so this helper copies an
+    existing pair file when available or reconstructs the unique OD list from
+    the current 10seed model comparison details.
+    """
+    dest = fixed_od_pairs_path(args)
+    if args.dry_run or dest.exists():
+        return dest
+
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    comparison_dir = od_root(args.outputs_root) / "model_od_comparison_10seed"
+    meta_path = comparison_dir / "model_od_meta.json"
+    if meta_path.exists():
+        pairs_path = Path(json.loads(meta_path.read_text(encoding="utf-8")).get("pairs", ""))
+        if pairs_path.exists():
+            shutil.copy2(pairs_path, dest)
+            print(f"[od] copied fixed OD pairs from {pairs_path}")
+            return dest
+
+    detail_path = comparison_dir / "model_od_detail.csv"
+    if detail_path.exists():
+        rows = read_csv(detail_path)
+        pairs: list[dict[str, object]] = []
+        seen: set[tuple[str, str, str]] = set()
+        for row in rows:
+            key = (row["group"], row["src"], row["dst"])
+            if key in seen:
+                continue
+            seen.add(key)
+            pairs.append({"group": row["group"], "src": row["src"], "dst": row["dst"]})
+        if pairs:
+            write_csv(dest, pairs)
+            print(f"[od] rebuilt {len(pairs)} fixed OD pairs from {detail_path}")
+            return dest
+
+    raise FileNotFoundError(
+        "Cannot find or rebuild fixed OD pairs. Run one OD comparison once or "
+        f"provide {dest} before running the OD stage."
+    )
 
 
 def fixed_instance_meta_paths(args: argparse.Namespace) -> dict[str, Path]:
@@ -404,6 +455,45 @@ def stage_models(args: argparse.Namespace) -> None:
     )
 
 
+def stage_node_tables(args: argparse.Namespace) -> None:
+    out_dir = model_dir(args.outputs_root) / "node_risk_eval_tables_10seed"
+    paper_dir = args.final_root / "paper_results" / "02_model_results"
+    run(
+        [
+            PYTHON,
+            "-B",
+            script("summarize_node_risk_eval_tables.py"),
+            "--mlp-source",
+            str(model_dir(args.outputs_root) / "mlp_A_B_s0_9_e50_10seed_summary.csv"),
+            "--formal-source",
+            str(
+                model_dir(args.outputs_root)
+                / "formal_graph_models_A_B_s0_9_e50_10seed_summary.csv"
+            ),
+            "--teg-low-source",
+            str(model_dir(args.outputs_root) / "teg_loss_teg_low_tail_s0_9_e50_10seed_summary.csv"),
+            "--stable-source",
+            str(
+                model_dir(args.outputs_root)
+                / "gcn_stabilized_teg_s0_9_e50_10seed_summary.csv"
+            ),
+            "--source-out-dir",
+            str(out_dir),
+            "--paper-out-dir",
+            str(paper_dir),
+            "--suffix",
+            "_10seed",
+            "--note-label",
+            (
+                "formal_graph_models_A_B_s0_9_e50_10seed_summary.csv + "
+                "teg_loss_teg_low_tail_s0_9_e50_10seed_summary.csv + "
+                "gcn_stabilized_teg_s0_9_e50_10seed_summary.csv"
+            ),
+        ],
+        args.dry_run,
+    )
+
+
 def export_base(
     args: argparse.Namespace,
     models: str,
@@ -588,12 +678,15 @@ def stage_od(args: argparse.Namespace) -> None:
         ],
     )
     batch_name = "model_od_comparison_10seed"
+    pairs_path = ensure_fixed_od_pairs(args)
     run(
         [
             PYTHON,
             "-B",
             script("compare_model_od_paths.py"),
             *source_args(sources),
+            "--pairs",
+            str(pairs_path),
             "--output-dir",
             str(od_root(args.outputs_root)),
             "--batch-name",
@@ -890,6 +983,21 @@ def stage_customer_sets(args: argparse.Namespace) -> None:
     )
 
 
+def stage_consistency_checks(args: argparse.Namespace) -> None:
+    run(
+        [
+            PYTHON,
+            "-B",
+            script("audit_experiment_consistency.py"),
+            "--outputs-root",
+            str(args.outputs_root),
+            "--final-root",
+            str(args.final_root),
+        ],
+        args.dry_run,
+    )
+
+
 def write_manifest(args: argparse.Namespace) -> None:
     if args.dry_run:
         return
@@ -919,6 +1027,8 @@ def main() -> None:
     stages = set(parse_csv(args.stages))
     if "models" in stages:
         stage_models(args)
+    if "node_tables" in stages:
+        stage_node_tables(args)
     if "risk" in stages:
         stage_risk(args)
     if "od" in stages:
@@ -929,6 +1039,8 @@ def main() -> None:
         stage_concentration(args)
     if "customer_sets" in stages:
         stage_customer_sets(args)
+    if "consistency_checks" in stages:
+        stage_consistency_checks(args)
     write_manifest(args)
 
 

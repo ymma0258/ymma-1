@@ -1,5 +1,5 @@
 {
-  "pairs": "D:\\PyVRP-main\\hazmat_risk_experiments\\outputs\\od_paths\\od_formal_floor001_p50_k50_cached_floor_0p01_a0p9_l1_p75\\od_pairs.csv",
+  "pairs": "D:\\PyVRP-main\\hazmat_risk_experiments\\outputs_10seed\\od_paths\\fixed_od_pairs_150.csv",
   "num_pairs": 150,
   "year": "data_2021",
   "k_paths": 50,

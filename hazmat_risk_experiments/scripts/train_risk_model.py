@@ -7,6 +7,13 @@ This script implements the stage-2 experiment scaffold:
 - Build split A/B/C masks without treating label 0 as low risk.
 - Train MLP, GCN, Weighted-GCN, or TEG-GNN with CE/ordinal/high-risk/top-k losses.
 - Report classification and high-risk metrics.
+- Optionally train uncertainty-aware GNN variants that estimate an ordinal
+  risk mean and a per-node predictive variance.
+- Train a Stable-Tail UA-GNN variant where uncertainty gates the TEG branch
+  instead of directly amplifying tail risk.
+- Train a Stable-Tail EC-GNN variant that keeps the Stable-Tail node
+  classifier and adds a small edge-risk calibration head for downstream
+  risk-matrix construction.
 
 The default arguments run a short smoke test. Increase ``--epochs`` for real
 experiments.
@@ -72,6 +79,10 @@ def parse_args() -> argparse.Namespace:
             "gcn_teg_concat",
             "gcn_teg_residual_fixed",
             "gcn_teg_residual_learnable",
+            "ua_gnn",
+            "ua_teg_gnn",
+            "stable_tail_ua_gnn",
+            "stable_tail_ec_gnn",
         ],
         default="teg_gnn",
     )
@@ -86,6 +97,27 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--alpha-ord", type=float, default=0.5)
     parser.add_argument("--alpha-hr", type=float, default=1.0)
     parser.add_argument("--alpha-topk", type=float, default=0.3)
+    parser.add_argument("--lambda-nll", type=float, default=0.0)
+    parser.add_argument("--lambda-var", type=float, default=0.0)
+    parser.add_argument("--ec-delta-max", type=float, default=0.05)
+    parser.add_argument("--lambda-edge", type=float, default=0.0)
+    parser.add_argument("--lambda-edge-high", type=float, default=0.0)
+    parser.add_argument("--lambda-distill", type=float, default=0.0)
+    parser.add_argument("--lambda-delta", type=float, default=0.0)
+    parser.add_argument(
+        "--ec-teacher-epochs",
+        type=int,
+        default=50,
+        help="Epochs for the frozen Stable-Tail teacher used by stable_tail_ec_gnn.",
+    )
+    parser.add_argument(
+        "--gamma-unc",
+        type=float,
+        default=0.5,
+        help="Strength of uncertainty suppression in stable_tail_ua_gnn.",
+    )
+    parser.add_argument("--logvar-min", type=float, default=-5.0)
+    parser.add_argument("--logvar-max", type=float, default=2.0)
     parser.add_argument("--experiment-tag", default="", help="Optional suffix for output files.")
     parser.add_argument(
         "--stage1-epochs",
@@ -260,12 +292,21 @@ class EdgeGatedConv(nn.Module):
         self.node_gate = nn.Linear(2 * dim, dim)
 
     def forward(
-        self, x: torch.Tensor, edge_index: torch.Tensor, edge_weight: torch.Tensor
+        self,
+        x: torch.Tensor,
+        edge_index: torch.Tensor,
+        edge_weight: torch.Tensor,
+        node_reliability: torch.Tensor | None = None,
     ) -> torch.Tensor:
         src, dst = edge_index
         edge_term = self.edge_gate(edge_weight.unsqueeze(1))
         node_term = self.node_gate(torch.cat([x[src], x[dst]], dim=1))
         gate = torch.sigmoid(edge_term + node_term)
+        if node_reliability is not None:
+            edge_reliability = torch.sqrt(
+                torch.clamp(node_reliability[src] * node_reliability[dst], min=EPS)
+            )
+            gate = gate * edge_reliability.unsqueeze(1)
         norm = normalize_messages(x.shape[0], edge_index, edge_weight)
         msg = gate * self.msg(x[src]) * norm.unsqueeze(1)
         out = torch.zeros_like(msg.new_zeros((x.shape[0], msg.shape[1])))
@@ -304,12 +345,31 @@ class EdgeGATConv(nn.Module):
 
 
 class RiskModel(nn.Module):
-    def __init__(self, model: str, in_dim: int, hidden_dim: int, dropout: float) -> None:
+    def __init__(
+        self,
+        model: str,
+        in_dim: int,
+        hidden_dim: int,
+        dropout: float,
+        gamma_unc: float = 0.5,
+        logvar_min: float = -5.0,
+        logvar_max: float = 2.0,
+        ec_delta_max: float = 0.05,
+    ) -> None:
         super().__init__()
         self.model = model
         self.encoder = nn.Linear(in_dim, hidden_dim)
         self.dropout = nn.Dropout(dropout)
         self.mu: nn.Parameter | None = None
+        self.has_uncertainty = model in {
+            "ua_gnn",
+            "ua_teg_gnn",
+            "stable_tail_ua_gnn",
+        }
+        self.gamma_unc = gamma_unc
+        self.logvar_min = logvar_min
+        self.logvar_max = logvar_max
+        self.ec_delta_max = ec_delta_max
 
         if model == "mlp":
             self.layers = nn.ModuleList()
@@ -329,6 +389,9 @@ class RiskModel(nn.Module):
             "gcn_teg_concat",
             "gcn_teg_residual_fixed",
             "gcn_teg_residual_learnable",
+            "ua_teg_gnn",
+            "stable_tail_ua_gnn",
+            "stable_tail_ec_gnn",
         }:
             self.gcn_layers = nn.ModuleList(
                 [GraphConv(hidden_dim, weighted=False), GraphConv(hidden_dim, weighted=False)]
@@ -337,7 +400,12 @@ class RiskModel(nn.Module):
                 [EdgeGatedConv(hidden_dim), EdgeGatedConv(hidden_dim)]
             )
             self.layers = nn.ModuleList()
-            if model == "gcn_teg_concat":
+            if model in {
+                "gcn_teg_concat",
+                "ua_teg_gnn",
+                "stable_tail_ua_gnn",
+                "stable_tail_ec_gnn",
+            }:
                 self.fusion = nn.Sequential(
                     nn.Linear(2 * hidden_dim, hidden_dim),
                     nn.ReLU(),
@@ -345,48 +413,123 @@ class RiskModel(nn.Module):
                 )
             elif model == "gcn_teg_residual_learnable":
                 self.mu = nn.Parameter(torch.tensor(0.1, dtype=torch.float32))
+        elif model == "ua_gnn":
+            self.layers = nn.ModuleList(
+                [GraphConv(hidden_dim, weighted=False), GraphConv(hidden_dim, weighted=False)]
+            )
         else:
             raise ValueError(f"Unknown model: {model}")
 
         self.classifier = nn.Linear(hidden_dim, NUM_CLASSES)
+        if self.has_uncertainty:
+            self.uncertainty_head = nn.Linear(hidden_dim, 1)
+        if model == "stable_tail_ua_gnn":
+            self.base_classifier = nn.Linear(hidden_dim, NUM_CLASSES)
+        if model == "stable_tail_ec_gnn":
+            self.calibration_head = nn.Sequential(
+                nn.Linear(hidden_dim, hidden_dim),
+                nn.ReLU(),
+                nn.Dropout(dropout),
+                nn.Linear(hidden_dim, 1),
+            )
 
     def _run_layers(
         self,
         h: torch.Tensor,
         layers: nn.ModuleList,
         graph: GraphData,
+        node_reliability: torch.Tensor | None = None,
     ) -> torch.Tensor:
         for layer in layers:
+            residual = h
+            if isinstance(layer, EdgeGatedConv):
+                h = F.relu(
+                    layer(h, graph.edge_index, graph.edge_weight, node_reliability)
+                )
+            else:
+                h = F.relu(layer(h, graph.edge_index, graph.edge_weight))
+            h = self.dropout(h + residual)
+        return h
+
+    def encode(self, graph: GraphData) -> torch.Tensor:
+        h = F.relu(self.encoder(graph.x))
+        if self.model == "mlp":
+            return self.dropout(h)
+
+        if self.model in {
+            "gcn_teg_concat",
+            "gcn_teg_residual_fixed",
+            "gcn_teg_residual_learnable",
+            "ua_teg_gnn",
+            "stable_tail_ua_gnn",
+            "stable_tail_ec_gnn",
+        }:
+            h_gcn = self._run_layers(h, self.gcn_layers, graph)
+            h_teg = self._run_layers(h, self.teg_layers, graph)
+            if self.model in {"gcn_teg_concat", "ua_teg_gnn", "stable_tail_ec_gnn"}:
+                h = self.fusion(torch.cat([h_gcn, h_teg], dim=1))
+            else:
+                mu = self.mu if self.mu is not None else h.new_tensor(0.1)
+                h = h_gcn + mu * h_teg
+            return h
+
+        for layer in self.layers:
             residual = h
             h = F.relu(layer(h, graph.edge_index, graph.edge_weight))
             h = self.dropout(h + residual)
         return h
 
     def forward(self, graph: GraphData) -> torch.Tensor:
-        h = F.relu(self.encoder(graph.x))
-        if self.model == "mlp":
-            h = self.dropout(h)
-            return self.classifier(h)
+        if self.model == "stable_tail_ua_gnn":
+            return self.forward_outputs(graph)[0]
+        return self.classifier(self.encode(graph))
 
-        if self.model in {
-            "gcn_teg_concat",
-            "gcn_teg_residual_fixed",
-            "gcn_teg_residual_learnable",
-        }:
-            h_gcn = self._run_layers(h, self.gcn_layers, graph)
-            h_teg = self._run_layers(h, self.teg_layers, graph)
-            if self.model == "gcn_teg_concat":
-                h = self.fusion(torch.cat([h_gcn, h_teg], dim=1))
-            else:
-                mu = self.mu if self.mu is not None else h.new_tensor(0.1)
-                h = h_gcn + mu * h_teg
-            return self.classifier(h)
+    def forward_outputs(self, graph: GraphData) -> tuple[torch.Tensor, torch.Tensor | None]:
+        if self.model == "stable_tail_ua_gnn":
+            h0 = F.relu(self.encoder(graph.x))
+            h_gcn = self._run_layers(h0, self.gcn_layers, graph)
 
-        for layer in self.layers:
-            residual = h
-            h = F.relu(layer(h, graph.edge_index, graph.edge_weight))
-            h = self.dropout(h + residual)
-        return self.classifier(h)
+            # Estimate uncertainty from the stable GCN branch. The TEG branch is
+            # deliberately excluded here to avoid feeding tail-amplified features
+            # back into the uncertainty estimate.
+            log_var = self.uncertainty_head(h_gcn).squeeze(1).clamp(
+                self.logvar_min, self.logvar_max
+            )
+            sigma = torch.sqrt(torch.exp(log_var))
+            reliability = torch.exp(-self.gamma_unc * sigma).clamp(EPS, 1.0)
+
+            h_teg = self._run_layers(h0, self.teg_layers, graph, reliability)
+            h = self.fusion(torch.cat([h_gcn, h_teg], dim=1))
+            return self.classifier(h), log_var
+
+        h = self.encode(graph)
+        logits = self.classifier(h)
+        if not self.has_uncertainty:
+            return logits, None
+        log_var = self.uncertainty_head(h).squeeze(1).clamp(
+            self.logvar_min, self.logvar_max
+        )
+        return logits, log_var
+
+    def forward_ec_outputs(
+        self, graph: GraphData
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+        """Return node logits and calibrated normalized risk for EC-GNN.
+
+        The classifier probabilities remain the node-risk prediction used for
+        node metrics. The calibrated score is only used by the edge-risk matrix
+        and edge-level training losses.
+        """
+
+        if self.model != "stable_tail_ec_gnn":
+            raise ValueError("forward_ec_outputs is only valid for stable_tail_ec_gnn")
+        h = self.encode(graph)
+        logits = self.classifier(h)
+        probs = F.softmax(logits, dim=1)
+        base_norm = torch.clamp((risk_scores(probs) - 1.0) / 7.0, 0.0, 1.0)
+        delta = self.ec_delta_max * torch.tanh(self.calibration_head(h).squeeze(1))
+        calibrated = torch.clamp(base_norm + delta, 0.0, 1.0)
+        return logits, base_norm, calibrated, delta, probs
 
 
 def class_weights(graphs: list[GraphData], split_map: dict[str, dict[str, np.ndarray]]) -> torch.Tensor:
@@ -418,6 +561,7 @@ def topk_loss(losses: torch.Tensor, frac: float) -> torch.Tensor:
 
 def compute_loss(
     logits: torch.Tensor,
+    log_var: torch.Tensor | None,
     labels: torch.Tensor,
     idx: np.ndarray,
     weights: torch.Tensor,
@@ -439,7 +583,14 @@ def compute_loss(
     ord_loss = torch.mean(torch.abs(s_i - (y.float() + 1.0)))
 
     if not full_loss:
-        return ce + 0.5 * ord_loss
+        base_loss = ce + 0.5 * ord_loss
+        if log_var is None or args.lambda_nll <= 0:
+            return base_loss
+        selected_log_var = log_var[idx_t]
+        nll = 0.5 * torch.exp(-selected_log_var) * (s_i - (y.float() + 1.0)).pow(2)
+        nll = (nll + 0.5 * selected_log_var).mean()
+        var_reg = torch.exp(selected_log_var).mean()
+        return base_loss + args.lambda_nll * nll + args.lambda_var * var_reg
 
     z = (y >= 5).float()
     p_high = torch.clamp(probs[:, 5:].sum(dim=1), EPS, 1.0 - EPS)
@@ -449,10 +600,182 @@ def compute_loss(
         weight=torch.where(z > 0, torch.full_like(z, pos_weight), torch.ones_like(z)),
     )
     tail = topk_loss(ce_each, args.topk_frac)
-    return ce + args.alpha_ord * ord_loss + args.alpha_hr * hr + args.alpha_topk * tail
+    loss = ce + args.alpha_ord * ord_loss + args.alpha_hr * hr + args.alpha_topk * tail
+    if log_var is not None and args.lambda_nll > 0:
+        selected_log_var = log_var[idx_t]
+        nll = 0.5 * torch.exp(-selected_log_var) * (s_i - (y.float() + 1.0)).pow(2)
+        nll = (nll + 0.5 * selected_log_var).mean()
+        var_reg = torch.exp(selected_log_var).mean()
+        loss = loss + args.lambda_nll * nll + args.lambda_var * var_reg
+    return loss
 
 
-def evaluate(logits: torch.Tensor, labels: torch.Tensor, idx: np.ndarray) -> dict[str, float]:
+def compute_edge_calibration_loss(
+    graph: GraphData,
+    train_idx: np.ndarray,
+    calibrated_norm: torch.Tensor,
+    probs: torch.Tensor,
+    pos_weight: float,
+) -> tuple[torch.Tensor, torch.Tensor]:
+    """Compute edge-level severity and high-risk losses for train-labeled edges.
+
+    Only edges with at least one training-labeled endpoint participate. Edges
+    with both endpoints labeled receive weight 1.0; one-labeled-endpoint edges
+    receive weight 0.5. This avoids leaking validation/test labels into the
+    edge calibration objective.
+    """
+
+    if train_idx.size == 0:
+        zero = calibrated_norm.new_tensor(0.0)
+        return zero, zero
+
+    device = calibrated_norm.device
+    train_mask = torch.zeros(graph.y.shape[0], dtype=torch.bool, device=device)
+    train_mask[torch.from_numpy(train_idx).long().to(device)] = True
+    src, dst = graph.edge_index.to(device)
+
+    # Use one direction per undirected edge because load_graph stores both
+    # directions. This keeps the edge loss from double-counting the same pair.
+    one_way = src < dst
+    src = src[one_way]
+    dst = dst[one_way]
+    src_labeled = train_mask[src]
+    dst_labeled = train_mask[dst]
+    keep = src_labeled | dst_labeled
+    if not torch.any(keep):
+        zero = calibrated_norm.new_tensor(0.0)
+        return zero, zero
+
+    src = src[keep]
+    dst = dst[keep]
+    src_labeled = src_labeled[keep]
+    dst_labeled = dst_labeled[keep]
+    both_labeled = src_labeled & dst_labeled
+    edge_weight = torch.where(
+        both_labeled,
+        torch.ones_like(calibrated_norm[src]),
+        torch.full_like(calibrated_norm[src], 0.5),
+    )
+
+    y = graph.y.to(device)
+    y_src = torch.clamp((y[src].float() - 1.0) / 7.0, 0.0, 1.0)
+    y_dst = torch.clamp((y[dst].float() - 1.0) / 7.0, 0.0, 1.0)
+    target = torch.where(
+        both_labeled,
+        torch.maximum(y_src, y_dst),
+        torch.where(src_labeled, y_src, y_dst),
+    )
+    pred = torch.maximum(calibrated_norm[src], calibrated_norm[dst])
+    edge_loss_each = F.smooth_l1_loss(pred, target, reduction="none")
+    edge_loss = torch.sum(edge_loss_each * edge_weight) / (edge_weight.sum() + EPS)
+
+    high_src = (y[src] >= 6) & src_labeled
+    high_dst = (y[dst] >= 6) & dst_labeled
+    z = (high_src | high_dst).float()
+    p_high = torch.clamp(probs[:, 5:].sum(dim=1), EPS, 1.0 - EPS)
+    pred_high = torch.maximum(p_high[src], p_high[dst])
+    high_weight = torch.where(
+        z > 0,
+        torch.full_like(z, pos_weight),
+        torch.ones_like(z),
+    )
+    edge_high_each = F.binary_cross_entropy(pred_high, z, reduction="none")
+    edge_high = torch.sum(edge_high_each * high_weight * edge_weight) / (
+        torch.sum(high_weight * edge_weight) + EPS
+    )
+    return edge_loss, edge_high
+
+
+def compute_distill_loss(
+    logits: torch.Tensor,
+    teacher_logits: torch.Tensor,
+    idx: np.ndarray,
+) -> torch.Tensor:
+    if idx.size == 0:
+        return logits.new_tensor(0.0)
+    idx_t = torch.from_numpy(idx).long()
+    selected = logits[idx_t]
+    teacher_selected = teacher_logits[idx_t].detach()
+    log_probs = F.log_softmax(selected, dim=1)
+    teacher_probs = F.softmax(teacher_selected, dim=1)
+    kl = F.kl_div(log_probs, teacher_probs, reduction="batchmean")
+    s_student = risk_scores(F.softmax(selected, dim=1))
+    s_teacher = risk_scores(teacher_probs)
+    score_loss = F.mse_loss(s_student, s_teacher)
+    return kl + score_loss
+
+
+def train_stable_tail_teacher(
+    args: argparse.Namespace,
+    graphs: list[GraphData],
+    split_map: dict[str, dict[str, np.ndarray]],
+    weights: torch.Tensor,
+    pos_weight: float,
+) -> RiskModel:
+    """Train a frozen Stable-Tail teacher for EC-GNN distillation.
+
+    The project historically treats ``gcn_teg_concat`` as Stable-Tail GNN, so
+    that same backbone is used as the teacher without reading or overwriting
+    any existing result files.
+    """
+
+    teacher = RiskModel(
+        "gcn_teg_concat",
+        graphs[0].x.shape[1],
+        args.hidden_dim,
+        args.dropout,
+    )
+    optimizer = torch.optim.AdamW(
+        teacher.parameters(), lr=args.lr, weight_decay=args.weight_decay
+    )
+    teacher_epochs = max(0, int(getattr(args, "ec_teacher_epochs", args.epochs)))
+    for epoch in range(teacher_epochs):
+        teacher.train()
+        optimizer.zero_grad()
+        total_loss = torch.tensor(0.0)
+        full_loss = epoch >= args.stage1_epochs
+        for graph in graphs:
+            logits, log_var = teacher.forward_outputs(graph)
+            total_loss = total_loss + compute_loss(
+                logits,
+                log_var,
+                graph.y,
+                split_map[graph.year]["train"],
+                weights,
+                args,
+                full_loss,
+                pos_weight,
+            )
+        total_loss.backward()
+        optimizer.step()
+    teacher.eval()
+    for param in teacher.parameters():
+        param.requires_grad_(False)
+    return teacher
+
+
+def expected_calibration_error(
+    confidences: np.ndarray, correct: np.ndarray, num_bins: int = 10
+) -> float:
+    ece = 0.0
+    for lower in np.linspace(0.0, 1.0, num_bins, endpoint=False):
+        upper = lower + 1.0 / num_bins
+        if upper >= 1.0:
+            mask = (confidences >= lower) & (confidences <= upper)
+        else:
+            mask = (confidences >= lower) & (confidences < upper)
+        if not np.any(mask):
+            continue
+        ece += float(mask.mean() * abs(correct[mask].mean() - confidences[mask].mean()))
+    return ece
+
+
+def evaluate(
+    logits: torch.Tensor,
+    labels: torch.Tensor,
+    idx: np.ndarray,
+    log_var: torch.Tensor | None = None,
+) -> dict[str, float]:
     if idx.size == 0:
         return {}
     idx_t = torch.from_numpy(idx).long()
@@ -476,8 +799,13 @@ def evaluate(logits: torch.Tensor, labels: torch.Tensor, idx: np.ndarray) -> dic
 
     high_count = max(1, int(high_true.sum()))
     high_fn_rate = float(np.logical_and(high_true, ~high_pred).sum() / high_count)
+    one_hot = np.eye(NUM_CLASSES, dtype=np.float32)[y_true - 1]
+    brier = float(np.mean(np.sum((probs - one_hot) ** 2, axis=1)))
+    confidence = probs.max(axis=1)
+    correct = y_pred == y_true
+    ece = expected_calibration_error(confidence, correct.astype(float))
 
-    return {
+    result = {
         "macro_f1": float(f1_score(y_true, y_pred, average="macro", zero_division=0)),
         "weighted_f1": float(f1_score(y_true, y_pred, average="weighted", zero_division=0)),
         "mae": float(mean_absolute_error(y_true, s_pred)),
@@ -486,7 +814,24 @@ def evaluate(logits: torch.Tensor, labels: torch.Tensor, idx: np.ndarray) -> dic
         "precision_6_8": float(precision_score(high_true, high_pred, zero_division=0)),
         "pr_auc_high": pr_auc,
         "high_fn_rate": high_fn_rate,
+        "brier": brier,
+        "ece": ece,
     }
+    if log_var is not None:
+        lv = log_var[idx_t].detach().numpy()
+        sigma = np.sqrt(np.exp(lv))
+        nll = 0.5 * np.exp(-lv) * (s_pred - y_true.astype(float)) ** 2 + 0.5 * lv
+        result["ordinal_nll"] = float(np.mean(nll))
+        result["uncertainty_mean"] = float(np.mean(sigma))
+        result["correct_uncertainty"] = float(np.mean(sigma[correct])) if np.any(correct) else float("nan")
+        result["error_uncertainty"] = float(np.mean(sigma[~correct])) if np.any(~correct) else float("nan")
+        if np.unique(correct).size > 1 and np.std(sigma) > 0:
+            result["error_uncertainty_corr"] = float(np.corrcoef((~correct).astype(float), sigma)[0, 1])
+        else:
+            result["error_uncertainty_corr"] = float("nan")
+        high_fn = np.logical_and(high_true, ~high_pred)
+        result["high_fn_uncertainty"] = float(np.mean(sigma[high_fn])) if np.any(high_fn) else float("nan")
+    return result
 
 
 def train(args: argparse.Namespace) -> dict[str, object]:
@@ -499,8 +844,16 @@ def train(args: argparse.Namespace) -> dict[str, object]:
     by_year = {graph.year: graph for graph in graphs}
     split_map = build_splits(graph20, graph21, args.split, args.seed)
 
-    model = RiskModel(args.model, graph20.x.shape[1], args.hidden_dim, args.dropout)
-    optimizer = torch.optim.AdamW(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
+    model = RiskModel(
+        args.model,
+        graph20.x.shape[1],
+        args.hidden_dim,
+        args.dropout,
+        getattr(args, "gamma_unc", 0.5),
+        getattr(args, "logvar_min", -5.0),
+        getattr(args, "logvar_max", 2.0),
+        getattr(args, "ec_delta_max", 0.05),
+    )
     weights = class_weights(graphs, split_map)
 
     train_labels = []
@@ -512,23 +865,89 @@ def train(args: argparse.Namespace) -> dict[str, object]:
     high_neg = sum(1 for label in train_labels if 0 < label < 6)
     pos_weight = min(high_neg / max(high_pos, 1), 5.0)
 
+    teacher: RiskModel | None = None
+    if args.model == "stable_tail_ec_gnn" and args.lambda_distill > 0:
+        teacher = train_stable_tail_teacher(args, graphs, split_map, weights, pos_weight)
+
+    if args.model == "stable_tail_ec_gnn":
+        cal_params = list(model.calibration_head.parameters())
+        cal_ids = {id(param) for param in cal_params}
+        backbone_params = [
+            param for param in model.parameters() if id(param) not in cal_ids
+        ]
+        optimizer = torch.optim.AdamW(
+            [
+                {"params": backbone_params, "lr": args.lr},
+                {"params": cal_params, "lr": args.lr},
+            ],
+            weight_decay=args.weight_decay,
+        )
+    else:
+        optimizer = torch.optim.AdamW(
+            model.parameters(), lr=args.lr, weight_decay=args.weight_decay
+        )
+
     history: list[dict[str, float]] = []
     for epoch in range(args.epochs):
         model.train()
         optimizer.zero_grad()
         total_loss = torch.tensor(0.0)
         full_loss = epoch >= args.stage1_epochs
+        if args.model == "stable_tail_ec_gnn":
+            # Keep the stable GCN/TEG representation from drifting too much
+            # once edge calibration starts; the small calibration head keeps
+            # the original learning rate.
+            optimizer.param_groups[0]["lr"] = args.lr * (0.4 if full_loss else 1.0)
+            optimizer.param_groups[1]["lr"] = args.lr
         for graph in graphs:
-            logits = model(graph)
-            total_loss = total_loss + compute_loss(
-                logits,
-                graph.y,
-                split_map[graph.year]["train"],
-                weights,
-                args,
-                full_loss,
-                pos_weight,
-            )
+            if args.model == "stable_tail_ec_gnn":
+                logits, _base_norm, calibrated_norm, delta, probs = model.forward_ec_outputs(graph)
+                node_loss = compute_loss(
+                    logits,
+                    None,
+                    graph.y,
+                    split_map[graph.year]["train"],
+                    weights,
+                    args,
+                    full_loss,
+                    pos_weight,
+                )
+                loss = node_loss
+                if teacher is not None:
+                    with torch.no_grad():
+                        teacher_logits, _teacher_log_var = teacher.forward_outputs(graph)
+                    loss = loss + args.lambda_distill * compute_distill_loss(
+                        logits,
+                        teacher_logits,
+                        split_map[graph.year]["train"],
+                    )
+                if full_loss:
+                    edge_loss, edge_high = compute_edge_calibration_loss(
+                        graph,
+                        split_map[graph.year]["train"],
+                        calibrated_norm,
+                        probs,
+                        pos_weight,
+                    )
+                    loss = (
+                        loss
+                        + args.lambda_edge * edge_loss
+                        + args.lambda_edge_high * edge_high
+                        + args.lambda_delta * delta.pow(2).mean()
+                    )
+                total_loss = total_loss + loss
+            else:
+                logits, log_var = model.forward_outputs(graph)
+                total_loss = total_loss + compute_loss(
+                    logits,
+                    log_var,
+                    graph.y,
+                    split_map[graph.year]["train"],
+                    weights,
+                    args,
+                    full_loss,
+                    pos_weight,
+                )
         total_loss.backward()
         optimizer.step()
         history.append({"epoch": epoch + 1, "loss": float(total_loss.detach())})
@@ -537,10 +956,10 @@ def train(args: argparse.Namespace) -> dict[str, object]:
     metrics: dict[str, dict[str, float]] = {}
     with torch.no_grad():
         for graph in graphs:
-            logits = model(graph)
+            logits, log_var = model.forward_outputs(graph)
             for split_name in ("train", "val", "test"):
                 idx = split_map[graph.year][split_name]
-                result = evaluate(logits, graph.y, idx)
+                result = evaluate(logits, graph.y, idx, log_var)
                 if result:
                     metrics[f"{graph.year}_{split_name}"] = result
 
@@ -553,6 +972,17 @@ def train(args: argparse.Namespace) -> dict[str, object]:
         "alpha_ord": args.alpha_ord,
         "alpha_hr": args.alpha_hr,
         "alpha_topk": args.alpha_topk,
+        "lambda_nll": args.lambda_nll,
+        "lambda_var": args.lambda_var,
+        "ec_delta_max": getattr(args, "ec_delta_max", 0.05),
+        "lambda_edge": getattr(args, "lambda_edge", 0.0),
+        "lambda_edge_high": getattr(args, "lambda_edge_high", 0.0),
+        "lambda_distill": getattr(args, "lambda_distill", 0.0),
+        "lambda_delta": getattr(args, "lambda_delta", 0.0),
+        "ec_teacher_epochs": getattr(args, "ec_teacher_epochs", 0),
+        "gamma_unc": getattr(args, "gamma_unc", 0.5),
+        "logvar_min": getattr(args, "logvar_min", -5.0),
+        "logvar_max": getattr(args, "logvar_max", 2.0),
         "topk_frac": args.topk_frac,
         "stage1_epochs": args.stage1_epochs,
         "pos_weight": pos_weight,

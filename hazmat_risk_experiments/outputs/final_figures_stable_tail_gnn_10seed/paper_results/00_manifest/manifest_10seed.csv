@@ -6,6 +6,10 @@ section,filename,source,description
 02_model_results,model_main_detail_10seed.csv,outputs_10seed\models\formal_graph_models_A_B_s0_9_e50_10seed_detail.csv,Per-run formal graph-model detail over seeds 0-9.
 02_model_results,stable_tail_ablation_10seed.csv,outputs_10seed\models\gcn_stabilized_teg_s0_9_e50_10seed_summary.csv,Stable-Tail comparison summary over seeds 0-9.
 02_model_results,stable_tail_ablation_detail_10seed.csv,outputs_10seed\models\gcn_stabilized_teg_s0_9_e50_10seed_detail.csv,Stable-Tail comparison detail over seeds 0-9.
+02_model_results,node_risk_ablation_splitA_with_high_fn_10seed.csv,outputs_10seed\models\node_risk_eval_tables_10seed\node_risk_ablation_splitA_with_high_fn_10seed.csv,Paper-ready node-risk tables with High FN for 10seed.
+02_model_results,node_risk_ablation_splitB_with_high_fn_10seed.csv,outputs_10seed\models\node_risk_eval_tables_10seed\node_risk_ablation_splitB_with_high_fn_10seed.csv,Paper-ready node-risk tables with High FN for 10seed.
+02_model_results,node_risk_ablation_with_high_fn_10seed.csv,outputs_10seed\models\node_risk_eval_tables_10seed\node_risk_ablation_with_high_fn_10seed.csv,Paper-ready node-risk tables with High FN for 10seed.
+02_model_results,node_risk_ablation_with_high_fn_10seed.md,outputs_10seed\models\node_risk_eval_tables_10seed\node_risk_ablation_with_high_fn_10seed.md,Paper-ready node-risk tables with High FN for 10seed.
 02_model_results,node_risk_eval_splitA_with_high_fn_10seed.csv,outputs_10seed\models\node_risk_eval_tables_10seed\node_risk_eval_splitA_with_high_fn_10seed.csv,Paper-ready node-risk tables with High FN for 10seed.
 02_model_results,node_risk_eval_splitB_with_high_fn_10seed.csv,outputs_10seed\models\node_risk_eval_tables_10seed\node_risk_eval_splitB_with_high_fn_10seed.csv,Paper-ready node-risk tables with High FN for 10seed.
 02_model_results,node_risk_eval_with_high_fn_10seed.csv,outputs_10seed\models\node_risk_eval_tables_10seed\node_risk_eval_with_high_fn_10seed.csv,Paper-ready node-risk tables with High FN for 10seed.

@@ -1,0 +1,30 @@
+{
+  "common_risk_dir": "hazmat_risk_experiments\\outputs_10seed\\risk_matrices\\common_ensemble4_10seed_floor_0p01",
+  "betas": [
+    0.0,
+    1.0
+  ],
+  "lambda_concentration": null,
+  "run_dirs": {
+    "A_Stable-Tail-UA-tau0p25_seed0": "hazmat_risk_experiments\\outputs_10seed\\stable_tail_ua_formal_10seed\\pyvrp_cvrp\\stable_tail_ua_pyvrp_beta1_tau0p25_10seed_A_Stable-Tail-UA-tau0p25_seed0",
+    "B_Stable-Tail-UA-tau0p25_seed0": "hazmat_risk_experiments\\outputs_10seed\\stable_tail_ua_formal_10seed\\pyvrp_cvrp\\stable_tail_ua_pyvrp_beta1_tau0p25_10seed_B_Stable-Tail-UA-tau0p25_seed0",
+    "A_Stable-Tail-UA-tau0p25_seed1": "hazmat_risk_experiments\\outputs_10seed\\stable_tail_ua_formal_10seed\\pyvrp_cvrp\\stable_tail_ua_pyvrp_beta1_tau0p25_10seed_A_Stable-Tail-UA-tau0p25_seed1",
+    "B_Stable-Tail-UA-tau0p25_seed1": "hazmat_risk_experiments\\outputs_10seed\\stable_tail_ua_formal_10seed\\pyvrp_cvrp\\stable_tail_ua_pyvrp_beta1_tau0p25_10seed_B_Stable-Tail-UA-tau0p25_seed1",
+    "A_Stable-Tail-UA-tau0p25_seed2": "hazmat_risk_experiments\\outputs_10seed\\stable_tail_ua_formal_10seed\\pyvrp_cvrp\\stable_tail_ua_pyvrp_beta1_tau0p25_10seed_A_Stable-Tail-UA-tau0p25_seed2",
+    "B_Stable-Tail-UA-tau0p25_seed2": "hazmat_risk_experiments\\outputs_10seed\\stable_tail_ua_formal_10seed\\pyvrp_cvrp\\stable_tail_ua_pyvrp_beta1_tau0p25_10seed_B_Stable-Tail-UA-tau0p25_seed2",
+    "A_Stable-Tail-UA-tau0p25_seed3": "hazmat_risk_experiments\\outputs_10seed\\stable_tail_ua_formal_10seed\\pyvrp_cvrp\\stable_tail_ua_pyvrp_beta1_tau0p25_10seed_A_Stable-Tail-UA-tau0p25_seed3",
+    "B_Stable-Tail-UA-tau0p25_seed3": "hazmat_risk_experiments\\outputs_10seed\\stable_tail_ua_formal_10seed\\pyvrp_cvrp\\stable_tail_ua_pyvrp_beta1_tau0p25_10seed_B_Stable-Tail-UA-tau0p25_seed3",
+    "A_Stable-Tail-UA-tau0p25_seed4": "hazmat_risk_experiments\\outputs_10seed\\stable_tail_ua_formal_10seed\\pyvrp_cvrp\\stable_tail_ua_pyvrp_beta1_tau0p25_10seed_A_Stable-Tail-UA-tau0p25_seed4",
+    "B_Stable-Tail-UA-tau0p25_seed4": "hazmat_risk_experiments\\outputs_10seed\\stable_tail_ua_formal_10seed\\pyvrp_cvrp\\stable_tail_ua_pyvrp_beta1_tau0p25_10seed_B_Stable-Tail-UA-tau0p25_seed4",
+    "A_Stable-Tail-UA-tau0p25_seed5": "hazmat_risk_experiments\\outputs_10seed\\stable_tail_ua_formal_10seed\\pyvrp_cvrp\\stable_tail_ua_pyvrp_beta1_tau0p25_10seed_A_Stable-Tail-UA-tau0p25_seed5",
+    "B_Stable-Tail-UA-tau0p25_seed5": "hazmat_risk_experiments\\outputs_10seed\\stable_tail_ua_formal_10seed\\pyvrp_cvrp\\stable_tail_ua_pyvrp_beta1_tau0p25_10seed_B_Stable-Tail-UA-tau0p25_seed5",
+    "A_Stable-Tail-UA-tau0p25_seed6": "hazmat_risk_experiments\\outputs_10seed\\stable_tail_ua_formal_10seed\\pyvrp_cvrp\\stable_tail_ua_pyvrp_beta1_tau0p25_10seed_A_Stable-Tail-UA-tau0p25_seed6",
+    "B_Stable-Tail-UA-tau0p25_seed6": "hazmat_risk_experiments\\outputs_10seed\\stable_tail_ua_formal_10seed\\pyvrp_cvrp\\stable_tail_ua_pyvrp_beta1_tau0p25_10seed_B_Stable-Tail-UA-tau0p25_seed6",
+    "A_Stable-Tail-UA-tau0p25_seed7": "hazmat_risk_experiments\\outputs_10seed\\stable_tail_ua_formal_10seed\\pyvrp_cvrp\\stable_tail_ua_pyvrp_beta1_tau0p25_10seed_A_Stable-Tail-UA-tau0p25_seed7",
+    "B_Stable-Tail-UA-tau0p25_seed7": "hazmat_risk_experiments\\outputs_10seed\\stable_tail_ua_formal_10seed\\pyvrp_cvrp\\stable_tail_ua_pyvrp_beta1_tau0p25_10seed_B_Stable-Tail-UA-tau0p25_seed7",
+    "A_Stable-Tail-UA-tau0p25_seed8": "hazmat_risk_experiments\\outputs_10seed\\stable_tail_ua_formal_10seed\\pyvrp_cvrp\\stable_tail_ua_pyvrp_beta1_tau0p25_10seed_A_Stable-Tail-UA-tau0p25_seed8",
+    "B_Stable-Tail-UA-tau0p25_seed8": "hazmat_risk_experiments\\outputs_10seed\\stable_tail_ua_formal_10seed\\pyvrp_cvrp\\stable_tail_ua_pyvrp_beta1_tau0p25_10seed_B_Stable-Tail-UA-tau0p25_seed8",
+    "A_Stable-Tail-UA-tau0p25_seed9": "hazmat_risk_experiments\\outputs_10seed\\stable_tail_ua_formal_10seed\\pyvrp_cvrp\\stable_tail_ua_pyvrp_beta1_tau0p25_10seed_A_Stable-Tail-UA-tau0p25_seed9",
+    "B_Stable-Tail-UA-tau0p25_seed9": "hazmat_risk_experiments\\outputs_10seed\\stable_tail_ua_formal_10seed\\pyvrp_cvrp\\stable_tail_ua_pyvrp_beta1_tau0p25_10seed_B_Stable-Tail-UA-tau0p25_seed9"
+  }
+}

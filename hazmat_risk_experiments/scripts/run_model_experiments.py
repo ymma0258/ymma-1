@@ -53,6 +53,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--alpha-ord", type=float, default=0.5)
     parser.add_argument("--alpha-hr", type=float, default=1.0)
     parser.add_argument("--alpha-topk", type=float, default=0.3)
+    parser.add_argument("--lambda-nll", type=float, default=0.0)
+    parser.add_argument("--lambda-var", type=float, default=0.0)
+    parser.add_argument("--gamma-unc", type=float, default=0.5)
+    parser.add_argument("--logvar-min", type=float, default=-5.0)
+    parser.add_argument("--logvar-max", type=float, default=2.0)
     parser.add_argument("--stage1-epochs", type=int, default=0)
     parser.add_argument("--experiment-tag", default="")
     parser.add_argument(
@@ -79,6 +84,11 @@ def train_args(base: argparse.Namespace, model: str, split: str, seed: int) -> a
         alpha_ord=base.alpha_ord,
         alpha_hr=base.alpha_hr,
         alpha_topk=base.alpha_topk,
+        lambda_nll=base.lambda_nll,
+        lambda_var=base.lambda_var,
+        gamma_unc=base.gamma_unc,
+        logvar_min=base.logvar_min,
+        logvar_max=base.logvar_max,
         stage1_epochs=base.stage1_epochs,
         experiment_tag=base.experiment_tag,
     )
@@ -100,6 +110,9 @@ def metric_rows(result: dict[str, object]) -> list[dict[str, object]]:
             "alpha_ord": result.get("alpha_ord", ""),
             "alpha_hr": result.get("alpha_hr", ""),
             "alpha_topk": result.get("alpha_topk", ""),
+            "lambda_nll": result.get("lambda_nll", ""),
+            "lambda_var": result.get("lambda_var", ""),
+            "gamma_unc": result.get("gamma_unc", ""),
             "topk_frac": result.get("topk_frac", ""),
             "stage1_epochs": result.get("stage1_epochs", ""),
             "eval_split": eval_split,
@@ -133,6 +146,14 @@ def summarize(rows: list[dict[str, object]]) -> list[dict[str, object]]:
         "precision_6_8",
         "pr_auc_high",
         "high_fn_rate",
+        "brier",
+        "ece",
+        "ordinal_nll",
+        "uncertainty_mean",
+        "correct_uncertainty",
+        "error_uncertainty",
+        "error_uncertainty_corr",
+        "high_fn_uncertainty",
     ]
     grouped: dict[tuple[object, object, object], list[dict[str, object]]] = {}
     for row in rows:
@@ -194,6 +215,9 @@ def main() -> None:
                 "alpha_ord": args.alpha_ord,
                 "alpha_hr": args.alpha_hr,
                 "alpha_topk": args.alpha_topk,
+                "lambda_nll": args.lambda_nll,
+                "lambda_var": args.lambda_var,
+                "gamma_unc": args.gamma_unc,
                 "topk_frac": args.topk_frac,
                 "stage1_epochs": args.stage1_epochs,
                 "error": repr(exc),
@@ -219,6 +243,9 @@ def main() -> None:
                 "alpha_ord": args.alpha_ord,
                 "alpha_hr": args.alpha_hr,
                 "alpha_topk": args.alpha_topk,
+                "lambda_nll": args.lambda_nll,
+                "lambda_var": args.lambda_var,
+                "gamma_unc": args.gamma_unc,
                 "topk_frac": args.topk_frac,
                 "stage1_epochs": args.stage1_epochs,
                 "elapsed_seconds": time.time() - started,

@@ -1,0 +1,2 @@
+od_count,unique_count,failed_count,high_high_count,high_normal_count,normal_high_count,pairs_file
+150,150,0,50,50,50,D:\PyVRP-main\hazmat_risk_experiments\outputs_10seed\od_paths\fixed_od_pairs_150.csv

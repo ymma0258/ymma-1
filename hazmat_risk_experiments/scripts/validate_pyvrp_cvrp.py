@@ -39,6 +39,7 @@ class CVRPInstance:
     num_vehicles: int
     d_norm: np.ndarray
     q_norm: np.ndarray
+    q_tail_norm: np.ndarray
     f_norm: np.ndarray
     hop_paths: dict[tuple[int, int], list[int]]
 
@@ -54,6 +55,15 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--customer-set", choices=["A", "B"], default="A")
     parser.add_argument("--betas", default="0,0.5")
     parser.add_argument("--lambda-concentration", default="0")
+    parser.add_argument(
+        "--tail-risk-eta",
+        type=float,
+        default=0.0,
+        help=(
+            "Blend path risk sum and path CVaR90 in the CVRP objective: "
+            "Q_tail=(1-eta)Q_sum+eta*Q_CVaR90. Default 0 keeps the original Q_sum."
+        ),
+    )
     parser.add_argument("--concentration-threshold", choices=["mean", "p75", "p90"], default="p75")
     parser.add_argument("--seeds", default="0")
     parser.add_argument("--max-runtime", type=float, default=10.0)
@@ -175,6 +185,11 @@ def path_risk(graph: nx.Graph, path: list[int]) -> float:
     return float(sum(graph[left][right]["risk"] for left, right in zip(path[:-1], path[1:])))
 
 
+def path_cvar90(graph: nx.Graph, path: list[int]) -> float:
+    risks = [float(graph[left][right]["risk"]) for left, right in zip(path[:-1], path[1:])]
+    return cvar(np.asarray(risks, dtype=float), 0.90)
+
+
 def path_concentration(graph: nx.Graph, path: list[int], threshold: float) -> float:
     return float(
         sum(
@@ -212,6 +227,7 @@ def build_instance(
     fixed_depot: int | None = None,
     fixed_customers: list[int] | None = None,
     concentration_threshold: str = "p75",
+    tail_risk_eta: float = 0.0,
 ) -> CVRPInstance:
     if fixed_depot is not None and fixed_customers is not None:
         depot = fixed_depot
@@ -232,6 +248,7 @@ def build_instance(
     n = len(nodes)
     d = np.zeros((n, n), dtype=float)
     q = np.zeros((n, n), dtype=float)
+    q_cvar = np.zeros((n, n), dtype=float)
     f = np.zeros((n, n), dtype=float)
     paths: dict[tuple[int, int], list[int]] = {}
     threshold_value = concentration_threshold_value(graph, concentration_threshold)
@@ -249,16 +266,21 @@ def build_instance(
             paths[(i, j)] = path
             d[i, j] = len(path) - 1
             q[i, j] = path_risk(graph, path)
+            q_cvar[i, j] = path_cvar90(graph, path)
             f[i, j] = path_concentration(graph, path, threshold_value)
 
     d_norm = normalize_matrix(d)
     q_norm = normalize_matrix(q)
+    q_tail = (1.0 - tail_risk_eta) * q + tail_risk_eta * q_cvar
+    q_tail_norm = normalize_matrix(q_tail)
     f_norm = normalize_matrix(f)
     d_norm = (d_norm + d_norm.T) / 2
     q_norm = (q_norm + q_norm.T) / 2
+    q_tail_norm = (q_tail_norm + q_tail_norm.T) / 2
     f_norm = (f_norm + f_norm.T) / 2
     np.fill_diagonal(d_norm, 0.0)
     np.fill_diagonal(q_norm, 0.0)
+    np.fill_diagonal(q_tail_norm, 0.0)
     np.fill_diagonal(f_norm, 0.0)
 
     return CVRPInstance(
@@ -269,6 +291,7 @@ def build_instance(
         num_vehicles=num_vehicles,
         d_norm=d_norm,
         q_norm=q_norm,
+        q_tail_norm=q_tail_norm,
         f_norm=f_norm,
         hop_paths=paths,
     )
@@ -515,6 +538,7 @@ def main() -> None:
         fixed_depot,
         fixed_customers,
         args.concentration_threshold,
+        args.tail_risk_eta,
     )
 
     rows: list[dict[str, object]] = []
@@ -526,7 +550,7 @@ def main() -> None:
     for beta in betas:
         lambda_values = [0.0] if abs(beta) <= EPS else lambdas
         for lambda_concentration in lambda_values:
-            cost = inst.d_norm + beta * inst.q_norm + lambda_concentration * inst.f_norm
+            cost = inst.d_norm + beta * inst.q_tail_norm + lambda_concentration * inst.f_norm
             np.fill_diagonal(cost, 0.0)
             for seed in seeds:
                 try:
@@ -563,6 +587,8 @@ def main() -> None:
         "customers": inst.customers,
         "betas": betas,
         "lambda_concentration": lambdas,
+        "tail_risk_eta": args.tail_risk_eta,
+        "tail_risk_definition": "Q_tail=(1-eta)Q_sum+eta*Q_CVaR90",
         "concentration_threshold": args.concentration_threshold,
         "seeds": seeds,
         "max_runtime": args.max_runtime,

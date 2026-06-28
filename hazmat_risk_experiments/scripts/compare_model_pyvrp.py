@@ -33,6 +33,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--customer-sets", default="A,B")
     parser.add_argument("--betas", default="0,1.0")
     parser.add_argument("--lambda-concentration", default="0")
+    parser.add_argument("--tail-risk-eta", type=float, default=0.0)
     parser.add_argument("--concentration-threshold", choices=["mean", "p75", "p90"], default="p75")
     parser.add_argument("--seeds", default="0,1,2,3,4")
     parser.add_argument("--max-runtime", type=float, default=10.0)
@@ -117,6 +118,8 @@ def run_one(
         args.betas,
         "--lambda-concentration",
         args.lambda_concentration,
+        "--tail-risk-eta",
+        str(args.tail_risk_eta),
         "--concentration-threshold",
         args.concentration_threshold,
         "--seeds",

@@ -1,0 +1,24 @@
+{
+  "models": [
+    "stable_tail_ua_gnn"
+  ],
+  "splits": [
+    "A"
+  ],
+  "seeds": [
+    0
+  ],
+  "epochs": 1,
+  "experiment_tag": "",
+  "alpha_ord": 0.3,
+  "alpha_hr": 0.5,
+  "alpha_topk": 0.1,
+  "lambda_nll": 0.2,
+  "lambda_var": 0.01,
+  "gamma_unc": 0.5,
+  "topk_frac": 0.2,
+  "stage1_epochs": 0,
+  "elapsed_seconds": 12.495691061019897,
+  "num_metric_rows": 3,
+  "num_failures": 0
+}
