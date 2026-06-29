@@ -5,3 +5,27 @@
 
 hazmat_risk_experiments/**/__pycache__/
 hazmat_risk_experiments/**/*.pyc
+
+# 虚拟环境（必须忽略，否则几百MB）
+.venv/
+venv/
+env/
+ENV/
+
+# Python 缓存文件
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+
+
+# IDE 和系统文件
+.vscode/
+.idea/
+*.log
+*.tmp
+Thumbs.db
+
+# Git 相关
+.git/
