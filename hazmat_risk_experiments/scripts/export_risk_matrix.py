@@ -1,7 +1,13 @@
-"""Export node risks, edge risks, and 5x8 risk matrices.
+"""Export node risks, edge risks, and 5x8 risk matrices from a checkpoint.
 
-This script trains one configured risk model, predicts node risk probabilities
-for both yearly graphs, and converts them into continuous edge risks:
+By default this script only loads a checkpoint produced by
+``train_risk_model.py``. This guarantees that node evaluation and downstream
+risk matrices use the identical trained state. Legacy train-and-export
+behaviour is available only through the explicit ``--train-before-export``
+diagnostic flag.
+
+The loaded model predicts node risk probabilities for both yearly graphs and
+converts them into continuous edge risks:
 
     R_ij = w_ij * max(S_i_norm, S_j_norm)
 
@@ -37,6 +43,17 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--zip", type=Path, default=train_risk_model.DEFAULT_ZIP)
     parser.add_argument("--output-dir", type=Path, default=DEFAULT_OUTPUT)
+    parser.add_argument(
+        "--checkpoint",
+        type=Path,
+        default=None,
+        help="Checkpoint created by train_risk_model.py (required by default).",
+    )
+    parser.add_argument(
+        "--train-before-export",
+        action="store_true",
+        help="Explicit legacy mode: train a new model before exporting.",
+    )
     parser.add_argument(
         "--model",
         default="teg_gnn",
@@ -90,157 +107,81 @@ def parse_args() -> argparse.Namespace:
         help="Use S_norm + tau * sigma_norm for uncertainty-aware robust risk.",
     )
     parser.add_argument("--stage1-epochs", type=int, default=0)
+    parser.add_argument("--split-b-val-fraction", type=float, default=0.2)
+    parser.add_argument(
+        "--checkpoint-selection", choices=["best", "last"], default="best"
+    )
+    parser.add_argument("--checkpoint-score-pr-weight", type=float, default=0.8)
+    parser.add_argument("--checkpoint-min-recall", type=float, default=0.0)
+    parser.add_argument("--checkpoint-max-high-fn", type=float, default=1.0)
+    parser.add_argument("--checkpoint-dir", type=Path, default=None)
+    parser.add_argument("--gate-normalized", action="store_true")
+    parser.add_argument("--feature-standardization", action="store_true")
+    parser.add_argument(
+        "--edge-normalization",
+        choices=["per_year", "shared_2020", "shared_train"],
+        default="per_year",
+    )
     parser.add_argument("--experiment-tag", default="")
     return parser.parse_args()
 
 
 def fit_model(args: argparse.Namespace) -> tuple[dict[str, object], train_risk_model.RiskModel, list[train_risk_model.GraphData]]:
-    train_risk_model.set_seed(args.seed)
-    import zipfile
-
-    with zipfile.ZipFile(args.zip) as zf:
-        graph20 = train_risk_model.load_graph(zf, "data_2020")
-        graph21 = train_risk_model.load_graph(zf, "data_2021")
-
-    graphs = [graph20, graph21]
-    split_map = train_risk_model.build_splits(graph20, graph21, args.split, args.seed)
-    model = train_risk_model.RiskModel(
-        args.model,
-        graph20.x.shape[1],
-        args.hidden_dim,
-        args.dropout,
-        getattr(args, "gamma_unc", 0.5),
-        getattr(args, "logvar_min", -5.0),
-        getattr(args, "logvar_max", 2.0),
-        getattr(args, "ec_delta_max", 0.05),
+    result = train_risk_model.train(args)
+    checkpoint = Path(str(result["checkpoint_path"]))
+    _payload, model, graphs = train_risk_model.load_checkpoint_model(
+        checkpoint, args.zip
     )
-    weights = train_risk_model.class_weights(graphs, split_map)
+    return result, model, graphs
 
-    train_labels: list[int] = []
-    for graph in graphs:
-        idx = split_map[graph.year]["train"]
-        if idx.size:
-            train_labels.extend(graph.y.numpy()[idx].tolist())
 
-    high_pos = sum(1 for label in train_labels if label >= 6)
-    high_neg = sum(1 for label in train_labels if 0 < label < 6)
-    pos_weight = min(high_neg / max(high_pos, 1), 5.0)
+def load_model_for_export(
+    args: argparse.Namespace,
+) -> tuple[
+    dict[str, object],
+    train_risk_model.RiskModel,
+    list[train_risk_model.GraphData],
+]:
+    if args.checkpoint is None:
+        if not args.train_before_export:
+            raise SystemExit(
+                "--checkpoint is required. Use --train-before-export only for explicit legacy diagnostics."
+            )
+        return fit_model(args)
 
-    teacher: train_risk_model.RiskModel | None = None
-    if args.model == "stable_tail_ec_gnn" and args.lambda_distill > 0:
-        teacher = train_risk_model.train_stable_tail_teacher(
-            args, graphs, split_map, weights, pos_weight
-        )
+    payload, model, graphs = train_risk_model.load_checkpoint_model(
+        args.checkpoint, args.zip
+    )
+    model_cfg = payload["model_config"]
+    train_cfg = payload["training_config"]
+    args.model = str(model_cfg["model"])
+    args.hidden_dim = int(model_cfg["hidden_dim"])
+    args.dropout = float(model_cfg["dropout"])
+    args.gamma_unc = float(model_cfg["gamma_unc"])
+    args.logvar_min = float(model_cfg["logvar_min"])
+    args.logvar_max = float(model_cfg["logvar_max"])
+    args.ec_delta_max = float(model_cfg["ec_delta_max"])
+    args.split = str(train_cfg["split"])
+    args.seed = int(train_cfg["seed"])
+    args.epochs = int(train_cfg["epochs"])
 
-    if args.model == "stable_tail_ec_gnn":
-        cal_params = list(model.calibration_head.parameters())
-        cal_ids = {id(param) for param in cal_params}
-        backbone_params = [
-            param for param in model.parameters() if id(param) not in cal_ids
-        ]
-        optimizer = torch.optim.AdamW(
-            [
-                {"params": backbone_params, "lr": args.lr},
-                {"params": cal_params, "lr": args.lr},
-            ],
-            weight_decay=args.weight_decay,
-        )
-    else:
-        optimizer = torch.optim.AdamW(
-            model.parameters(), lr=args.lr, weight_decay=args.weight_decay
-        )
-
-    history: list[dict[str, float]] = []
-    for epoch in range(args.epochs):
-        model.train()
-        optimizer.zero_grad()
-        total_loss = torch.tensor(0.0)
-        full_loss = epoch >= args.stage1_epochs
-        if args.model == "stable_tail_ec_gnn":
-            optimizer.param_groups[0]["lr"] = args.lr * (0.4 if full_loss else 1.0)
-            optimizer.param_groups[1]["lr"] = args.lr
-        for graph in graphs:
-            if args.model == "stable_tail_ec_gnn":
-                logits, _base_norm, calibrated_norm, delta, probs = model.forward_ec_outputs(graph)
-                loss = train_risk_model.compute_loss(
-                    logits,
-                    None,
-                    graph.y,
-                    split_map[graph.year]["train"],
-                    weights,
-                    args,
-                    full_loss,
-                    pos_weight,
-                )
-                if teacher is not None:
-                    with torch.no_grad():
-                        teacher_logits, _teacher_log_var = teacher.forward_outputs(graph)
-                    loss = loss + args.lambda_distill * train_risk_model.compute_distill_loss(
-                        logits,
-                        teacher_logits,
-                        split_map[graph.year]["train"],
-                    )
-                if full_loss:
-                    edge_loss, edge_high = train_risk_model.compute_edge_calibration_loss(
-                        graph,
-                        split_map[graph.year]["train"],
-                        calibrated_norm,
-                        probs,
-                        pos_weight,
-                    )
-                    loss = (
-                        loss
-                        + args.lambda_edge * edge_loss
-                        + args.lambda_edge_high * edge_high
-                        + args.lambda_delta * delta.pow(2).mean()
-                    )
-                total_loss = total_loss + loss
-            else:
-                logits, log_var = model.forward_outputs(graph)
-                total_loss = total_loss + train_risk_model.compute_loss(
-                    logits,
-                    log_var,
-                    graph.y,
-                    split_map[graph.year]["train"],
-                    weights,
-                    args,
-                    full_loss,
-                    pos_weight,
-                )
-        total_loss.backward()
-        optimizer.step()
-        history.append({"epoch": epoch + 1, "loss": float(total_loss.detach())})
-
-    model.eval()
+    split_map = payload["split_map"]
     metrics: dict[str, dict[str, float]] = {}
     with torch.no_grad():
         for graph in graphs:
             logits, log_var = model.forward_outputs(graph)
             for split_name in ("train", "val", "test"):
                 idx = split_map[graph.year][split_name]
-                result = train_risk_model.evaluate(logits, graph.y, idx, log_var)
-                if result:
-                    metrics[f"{graph.year}_{split_name}"] = result
-
-    result: dict[str, object] = {
+                values = train_risk_model.evaluate(logits, graph.y, idx, log_var)
+                if values:
+                    metrics[f"{graph.year}_{split_name}"] = values
+    result = {
         "model": args.model,
         "split": args.split,
         "seed": args.seed,
         "epochs": args.epochs,
-        "pos_weight": pos_weight,
-        "lambda_nll": args.lambda_nll,
-        "lambda_var": args.lambda_var,
-        "ec_delta_max": args.ec_delta_max,
-        "lambda_edge": args.lambda_edge,
-        "lambda_edge_high": args.lambda_edge_high,
-        "lambda_distill": args.lambda_distill,
-        "lambda_delta": args.lambda_delta,
-        "ec_teacher_epochs": args.ec_teacher_epochs,
-        "gamma_unc": getattr(args, "gamma_unc", 0.5),
-        "logvar_min": getattr(args, "logvar_min", -5.0),
-        "logvar_max": getattr(args, "logvar_max", 2.0),
-        "uncertainty_tau": args.uncertainty_tau,
-        "history": history,
+        "best_epoch": int(train_cfg["best_epoch"]),
+        "checkpoint_path": str(args.checkpoint.resolve()),
         "metrics": metrics,
         "split_sizes": {
             year: {name: int(idx.size) for name, idx in splits.items()}
@@ -511,6 +452,9 @@ def write_report(path: Path, payload: dict[str, object]) -> None:
         f"- Model: `{payload['model']}`; split: `{payload['split']}`; seed: `{payload['seed']}`; epochs: `{payload['epochs']}`."
     )
     lines.append(
+        f"- Source: `{payload['model_source']}`; checkpoint: `{payload.get('checkpoint_path')}`; selected epoch: `{payload.get('best_epoch')}`."
+    )
+    lines.append(
         f"- Risk mode: `{payload['risk_mode']}`; exposure delta: `{payload['exposure_delta']}`."
     )
     lines.append("")
@@ -547,7 +491,7 @@ def write_report(path: Path, payload: dict[str, object]) -> None:
 def main() -> None:
     args = parse_args()
     args.output_dir.mkdir(parents=True, exist_ok=True)
-    result, model, graphs = fit_model(args)
+    result, model, graphs = load_model_for_export(args)
 
     if args.risk_mode == "exposure_floor":
         risk_suffix = f"floor_{args.exposure_delta:g}".replace(".", "p")
@@ -607,6 +551,9 @@ def main() -> None:
         "exposure_delta": args.exposure_delta,
         "uncertainty_tau": args.uncertainty_tau,
         "experiment_tag": args.experiment_tag,
+        "checkpoint_path": result.get("checkpoint_path"),
+        "best_epoch": result.get("best_epoch", args.epochs),
+        "model_source": "trained_during_export" if args.train_before_export else "checkpoint",
         "alpha_ord": args.alpha_ord,
         "alpha_hr": args.alpha_hr,
         "alpha_topk": args.alpha_topk,

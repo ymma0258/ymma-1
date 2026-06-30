@@ -1,0 +1,20 @@
+{
+  "common_risk_dir": "D:\\PyVRP-main\\hazmat_risk_experiments\\outputs_10seed\\risk_matrices\\common_ensemble4_10seed_floor_0p01",
+  "betas": [
+    1.5
+  ],
+  "lambda_concentration": 1.0,
+  "definition": "regional edge risk multiplied by pre-service remaining load / vehicle capacity",
+  "run_dirs": {
+    "ST-v1_seed0": "D:\\PyVRP-main\\hazmat_risk_experiments\\outputs_10seed\\st_v1_formal_10seed\\pyvrp_cvrp\\st_v1_tc_lite_eta0p7_b1p5_l1_10seed_B_ST-v1_seed0",
+    "ST-v1_seed1": "D:\\PyVRP-main\\hazmat_risk_experiments\\outputs_10seed\\st_v1_formal_10seed\\pyvrp_cvrp\\st_v1_tc_lite_eta0p7_b1p5_l1_10seed_B_ST-v1_seed1",
+    "ST-v1_seed2": "D:\\PyVRP-main\\hazmat_risk_experiments\\outputs_10seed\\st_v1_formal_10seed\\pyvrp_cvrp\\st_v1_tc_lite_eta0p7_b1p5_l1_10seed_B_ST-v1_seed2",
+    "ST-v1_seed3": "D:\\PyVRP-main\\hazmat_risk_experiments\\outputs_10seed\\st_v1_formal_10seed\\pyvrp_cvrp\\st_v1_tc_lite_eta0p7_b1p5_l1_10seed_B_ST-v1_seed3",
+    "ST-v1_seed4": "D:\\PyVRP-main\\hazmat_risk_experiments\\outputs_10seed\\st_v1_formal_10seed\\pyvrp_cvrp\\st_v1_tc_lite_eta0p7_b1p5_l1_10seed_B_ST-v1_seed4",
+    "ST-v1_seed5": "D:\\PyVRP-main\\hazmat_risk_experiments\\outputs_10seed\\st_v1_formal_10seed\\pyvrp_cvrp\\st_v1_tc_lite_eta0p7_b1p5_l1_10seed_B_ST-v1_seed5",
+    "ST-v1_seed6": "D:\\PyVRP-main\\hazmat_risk_experiments\\outputs_10seed\\st_v1_formal_10seed\\pyvrp_cvrp\\st_v1_tc_lite_eta0p7_b1p5_l1_10seed_B_ST-v1_seed6",
+    "ST-v1_seed7": "D:\\PyVRP-main\\hazmat_risk_experiments\\outputs_10seed\\st_v1_formal_10seed\\pyvrp_cvrp\\st_v1_tc_lite_eta0p7_b1p5_l1_10seed_B_ST-v1_seed7",
+    "ST-v1_seed8": "D:\\PyVRP-main\\hazmat_risk_experiments\\outputs_10seed\\st_v1_formal_10seed\\pyvrp_cvrp\\st_v1_tc_lite_eta0p7_b1p5_l1_10seed_B_ST-v1_seed8",
+    "ST-v1_seed9": "D:\\PyVRP-main\\hazmat_risk_experiments\\outputs_10seed\\st_v1_formal_10seed\\pyvrp_cvrp\\st_v1_tc_lite_eta0p7_b1p5_l1_10seed_B_ST-v1_seed9"
+  }
+}

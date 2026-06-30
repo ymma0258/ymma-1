@@ -59,6 +59,21 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--logvar-min", type=float, default=-5.0)
     parser.add_argument("--logvar-max", type=float, default=2.0)
     parser.add_argument("--stage1-epochs", type=int, default=0)
+    parser.add_argument("--split-b-val-fraction", type=float, default=0.2)
+    parser.add_argument(
+        "--checkpoint-selection", choices=["best", "last"], default="best"
+    )
+    parser.add_argument("--checkpoint-score-pr-weight", type=float, default=0.8)
+    parser.add_argument("--checkpoint-min-recall", type=float, default=0.0)
+    parser.add_argument("--checkpoint-max-high-fn", type=float, default=1.0)
+    parser.add_argument("--checkpoint-dir", type=Path, default=None)
+    parser.add_argument("--gate-normalized", action="store_true")
+    parser.add_argument("--feature-standardization", action="store_true")
+    parser.add_argument(
+        "--edge-normalization",
+        choices=["per_year", "shared_2020", "shared_train"],
+        default="per_year",
+    )
     parser.add_argument("--experiment-tag", default="")
     parser.add_argument(
         "--batch-name",
@@ -90,6 +105,15 @@ def train_args(base: argparse.Namespace, model: str, split: str, seed: int) -> a
         logvar_min=base.logvar_min,
         logvar_max=base.logvar_max,
         stage1_epochs=base.stage1_epochs,
+        split_b_val_fraction=base.split_b_val_fraction,
+        checkpoint_selection=base.checkpoint_selection,
+        checkpoint_score_pr_weight=base.checkpoint_score_pr_weight,
+        checkpoint_min_recall=base.checkpoint_min_recall,
+        checkpoint_max_high_fn=base.checkpoint_max_high_fn,
+        checkpoint_dir=base.checkpoint_dir,
+        gate_normalized=base.gate_normalized,
+        feature_standardization=base.feature_standardization,
+        edge_normalization=base.edge_normalization,
         experiment_tag=base.experiment_tag,
     )
 
@@ -106,6 +130,7 @@ def metric_rows(result: dict[str, object]) -> list[dict[str, object]]:
             "split": result["split"],
             "seed": result["seed"],
             "epochs": result["epochs"],
+            "best_epoch": result.get("best_epoch", result["epochs"]),
             "experiment_tag": result.get("experiment_tag", ""),
             "alpha_ord": result.get("alpha_ord", ""),
             "alpha_hr": result.get("alpha_hr", ""),
@@ -115,6 +140,10 @@ def metric_rows(result: dict[str, object]) -> list[dict[str, object]]:
             "gamma_unc": result.get("gamma_unc", ""),
             "topk_frac": result.get("topk_frac", ""),
             "stage1_epochs": result.get("stage1_epochs", ""),
+            "checkpoint_selection": result.get("checkpoint_selection", ""),
+            "gate_normalized": result.get("gate_normalized", False),
+            "feature_standardization": result.get("feature_standardization", False),
+            "edge_normalization": result.get("edge_normalization", ""),
             "eval_split": eval_split,
         }
         row.update(values)
@@ -248,6 +277,11 @@ def main() -> None:
                 "gamma_unc": args.gamma_unc,
                 "topk_frac": args.topk_frac,
                 "stage1_epochs": args.stage1_epochs,
+                "split_b_val_fraction": args.split_b_val_fraction,
+                "checkpoint_selection": args.checkpoint_selection,
+                "gate_normalized": args.gate_normalized,
+                "feature_standardization": args.feature_standardization,
+                "edge_normalization": args.edge_normalization,
                 "elapsed_seconds": time.time() - started,
                 "num_metric_rows": len(all_rows),
                 "num_failures": len(failures),

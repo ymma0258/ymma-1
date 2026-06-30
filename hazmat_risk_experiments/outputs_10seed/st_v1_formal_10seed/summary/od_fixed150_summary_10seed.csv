@@ -1,0 +1,2 @@
+model,model_seeds,hop_increase_mean,hop_increase_std,total_risk_reduction_mean,total_risk_reduction_std,cvar90_reduction_mean,cvar90_reduction_std,maxrisk_reduction_mean,maxrisk_reduction_std,re_reduction_mean,re_reduction_std
+ST-v1,10,0.1022606846856713,0.007237780864731882,0.8501242255258762,0.004092985785065671,0.900522432363943,0.002671542283553541,0.9078246648346897,0.0026946331126803335,0.9171989556963501,0.005019581058631217

@@ -499,6 +499,7 @@ def export_base(
     models: str,
     tag: str,
     extra_loss_args: list[str] | None = None,
+    checkpoint_tag: str | None = None,
 ) -> None:
     cmd = [
         PYTHON,
@@ -520,7 +521,11 @@ def export_base(
         "0.01",
         "--experiment-tag",
         tag,
+        "--checkpoint-dir",
+        str(model_dir(args.outputs_root) / "checkpoints"),
     ]
+    if checkpoint_tag is not None:
+        cmd.extend(["--checkpoint-tag", checkpoint_tag])
     if extra_loss_args:
         cmd.extend(extra_loss_args)
     run(cmd, args.dry_run)
@@ -529,7 +534,13 @@ def export_base(
 def stage_risk(args: argparse.Namespace) -> None:
     export_base(args, "gcn,weighted_gcn,edge_gat", "10seed")
     export_base(args, "teg_gnn", "teg_low_tail_10seed", LOW_TAIL_ARGS)
-    export_base(args, "gcn_teg_concat", "10seed", LOW_TAIL_ARGS)
+    export_base(
+        args,
+        "gcn_teg_concat",
+        "10seed",
+        LOW_TAIL_ARGS,
+        checkpoint_tag="gcn_stabilized_lowtail_10seed",
+    )
 
     seeds = parse_seed_csv(args.seeds)
     for seed in seeds:
