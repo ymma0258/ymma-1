@@ -122,6 +122,10 @@ def metrics_for_sequences(graph, inst, sequences: list[list[int]]) -> dict[str, 
     route_arr = np.asarray(route_totals, dtype=float)
     all_arr = np.asarray(all_risks, dtype=float)
     burdens = edge_burdens(graph, inst, sequences)
+    graph_risks = np.asarray(
+        [float(data["risk"]) for _, _, data in graph.edges(data=True)], dtype=float
+    )
+    high_threshold = float(np.quantile(graph_risks, 0.90)) if graph_risks.size else math.inf
     top_count = max(1, int(math.ceil(burdens.size * 0.10))) if burdens.size else 0
     top_share = (
         float(np.sort(burdens)[-top_count:].sum() / (burdens.sum() + pyvrp_eval.EPS))
@@ -131,6 +135,9 @@ def metrics_for_sequences(graph, inst, sequences: list[list[int]]) -> dict[str, 
     return {
         "common_global_risk": float(all_arr.sum()) if all_arr.size else 0.0,
         "common_global_cvar90": pyvrp_eval.cvar(all_arr, 0.90),
+        "common_global_cvar95": pyvrp_eval.cvar(all_arr, 0.95),
+        "common_max_edge_risk": float(all_arr.max()) if all_arr.size else 0.0,
+        "common_high_risk_edge_hits": float(np.sum(all_arr >= high_threshold)),
         "common_max_vehicle_risk": float(route_arr.max()) if route_arr.size else 0.0,
         "common_max_vehicle_cvar90": float(max(route_cvars)) if route_cvars else 0.0,
         "common_vehicle_risk_gini": pyvrp_eval.gini(route_arr),
@@ -144,6 +151,9 @@ def summarize(rows: list[dict[str, object]]) -> list[dict[str, object]]:
     metrics = [
         "common_global_risk",
         "common_global_cvar90",
+        "common_global_cvar95",
+        "common_max_edge_risk",
+        "common_high_risk_edge_hits",
         "common_max_vehicle_risk",
         "common_max_vehicle_cvar90",
         "common_vehicle_risk_gini",

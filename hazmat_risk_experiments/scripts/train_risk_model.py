@@ -954,6 +954,36 @@ def expected_calibration_error(
     return ece
 
 
+def ranking_metrics(y_true: np.ndarray, scores: np.ndarray) -> dict[str, float]:
+    """Compute high-risk retrieval metrics used by downstream ranking tasks."""
+
+    if y_true.size == 0:
+        return {}
+    order = np.argsort(-scores, kind="stable")
+    high = y_true >= 6
+    high_count = max(1, int(high.sum()))
+
+    def top_count(fraction: float) -> int:
+        return min(y_true.size, max(1, int(math.ceil(y_true.size * fraction))))
+
+    top10 = order[: top_count(0.10)]
+    top20 = order[: top_count(0.20)]
+    cutoff = top_count(0.20)
+    relevance = np.power(2.0, y_true.astype(float) - 1.0) - 1.0
+    discounts = 1.0 / np.log2(np.arange(2, cutoff + 2, dtype=float))
+    dcg = float(np.sum(relevance[order[:cutoff]] * discounts))
+    ideal = np.argsort(-relevance, kind="stable")[:cutoff]
+    ideal_dcg = float(np.sum(relevance[ideal] * discounts))
+
+    return {
+        "high_risk_recall_at_top10pct": float(high[top10].sum() / high_count),
+        "high_risk_recall_at_top20pct": float(high[top20].sum() / high_count),
+        "ndcg_at_top20pct": dcg / ideal_dcg if ideal_dcg > 0 else 0.0,
+        "high_risk_hits_at_10": float(high[order[: min(10, y_true.size)]].sum()),
+        "high_risk_hits_at_20": float(high[order[: min(20, y_true.size)]].sum()),
+    }
+
+
 def evaluate(
     logits: torch.Tensor,
     labels: torch.Tensor,
@@ -1001,6 +1031,7 @@ def evaluate(
         "brier": brier,
         "ece": ece,
     }
+    result.update(ranking_metrics(y_true, s_pred))
     if log_var is not None:
         lv = log_var[idx_t].detach().numpy()
         sigma = np.sqrt(np.exp(lv))

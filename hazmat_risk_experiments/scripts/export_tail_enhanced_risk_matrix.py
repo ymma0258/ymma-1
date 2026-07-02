@@ -22,6 +22,16 @@ import numpy as np
 DEFAULT_OUTPUT = Path(r"D:\PyVRP-main\hazmat_risk_experiments\outputs\risk_matrices")
 
 
+def tail_node_scores(scores_norm: np.ndarray, p_high: np.ndarray, eta: float) -> np.ndarray:
+    """Compute S_i,tail = clip(S_i,norm + eta * P_high,i, 0, 1)."""
+
+    if eta < 0:
+        raise ValueError("eta must be non-negative")
+    if scores_norm.shape != p_high.shape:
+        raise ValueError("scores_norm and p_high must have the same shape")
+    return np.clip(scores_norm.astype(float) + eta * p_high.astype(float), 0.0, 1.0)
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--base-risk-dir", type=Path, required=True)
@@ -70,15 +80,16 @@ def export_year(base_dir: Path, out_dir: Path, year: str, eta: float) -> dict[st
     labels = node["labels"].astype(np.int64)
     scores = node["scores"]
     p_high = node["p_high"]
-    scores_norm = np.clip(node["scores_norm"] + eta * p_high, 0.0, 1.0)
+    base_scores_norm = np.clip(node["scores_norm"].astype(float), 0.0, 1.0)
+    scores_tail = tail_node_scores(base_scores_norm, p_high, eta)
     pred_label = node["pred_label"]
 
     src = edge_ref["src"]
     dst = edge_ref["dst"]
     w_raw = edge_ref["w_raw"]
     w_norm = edge_ref["w_norm"]
-    severity = 1.0 + 7.0 * np.maximum(scores_norm[src], scores_norm[dst])
-    severity_norm = np.maximum(scores_norm[src], scores_norm[dst])
+    severity = 1.0 + 7.0 * np.maximum(scores_tail[src], scores_tail[dst])
+    severity_norm = np.maximum(scores_tail[src], scores_tail[dst])
     risk = w_norm * severity_norm
     p_level = quantile_levels(w_norm, 5)
     c_level = np.clip(np.ceil(severity), 1, 8).astype(np.int64)
@@ -102,7 +113,11 @@ def export_year(base_dir: Path, out_dir: Path, year: str, eta: float) -> dict[st
         out_dir / f"{year}_node_risk.npz",
         probs=probs,
         scores=scores,
-        scores_norm=scores_norm,
+        # Keep scores_norm as the active score for compatibility with existing
+        # graph loaders, while retaining both terms of the formal definition.
+        scores_norm=scores_tail,
+        scores_base_norm=base_scores_norm,
+        scores_tail=scores_tail,
         p_high=p_high,
         pred_label=pred_label,
         labels=labels,
@@ -116,7 +131,8 @@ def export_year(base_dir: Path, out_dir: Path, year: str, eta: float) -> dict[st
             "label": int(labels[node_id]),
             "pred_label": int(pred_label[node_id]),
             "S_i": float(scores[node_id]),
-            "S_i_norm": float(scores_norm[node_id]),
+            "S_i_norm": float(base_scores_norm[node_id]),
+            "S_i_tail": float(scores_tail[node_id]),
             "P_high": float(p_high[node_id]),
         }
         for cls_idx in range(probs.shape[1]):
@@ -167,6 +183,7 @@ def main() -> None:
         "base_risk_dir": str(args.base_risk_dir),
         "eta": args.eta,
         "definition": "S_tail = clip(S_norm + eta * P_high, 0, 1)",
+        "edge_definition": "R_ij_tail = w_ij_floor * max(S_i_tail, S_j_tail)",
         "summaries": summaries,
     }
     (out_dir / "export_summary.json").write_text(

@@ -55,6 +55,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--alpha-topk", type=float, default=0.3)
     parser.add_argument("--lambda-nll", type=float, default=0.0)
     parser.add_argument("--lambda-var", type=float, default=0.0)
+    parser.add_argument("--ec-delta-max", type=float, default=0.05)
+    parser.add_argument("--lambda-edge", type=float, default=0.0)
+    parser.add_argument("--lambda-edge-high", type=float, default=0.0)
+    parser.add_argument("--lambda-distill", type=float, default=0.0)
+    parser.add_argument("--lambda-delta", type=float, default=0.0)
+    parser.add_argument("--ec-teacher-epochs", type=int, default=50)
     parser.add_argument("--gamma-unc", type=float, default=0.5)
     parser.add_argument("--logvar-min", type=float, default=-5.0)
     parser.add_argument("--logvar-max", type=float, default=2.0)
@@ -101,6 +107,12 @@ def train_args(base: argparse.Namespace, model: str, split: str, seed: int) -> a
         alpha_topk=base.alpha_topk,
         lambda_nll=base.lambda_nll,
         lambda_var=base.lambda_var,
+        ec_delta_max=base.ec_delta_max,
+        lambda_edge=base.lambda_edge,
+        lambda_edge_high=base.lambda_edge_high,
+        lambda_distill=base.lambda_distill,
+        lambda_delta=base.lambda_delta,
+        ec_teacher_epochs=base.ec_teacher_epochs,
         gamma_unc=base.gamma_unc,
         logvar_min=base.logvar_min,
         logvar_max=base.logvar_max,
@@ -246,6 +258,12 @@ def main() -> None:
                 "alpha_topk": args.alpha_topk,
                 "lambda_nll": args.lambda_nll,
                 "lambda_var": args.lambda_var,
+                "ec_delta_max": args.ec_delta_max,
+                "lambda_edge": args.lambda_edge,
+                "lambda_edge_high": args.lambda_edge_high,
+                "lambda_distill": args.lambda_distill,
+                "lambda_delta": args.lambda_delta,
+                "ec_teacher_epochs": args.ec_teacher_epochs,
                 "gamma_unc": args.gamma_unc,
                 "topk_frac": args.topk_frac,
                 "stage1_epochs": args.stage1_epochs,
@@ -274,6 +292,12 @@ def main() -> None:
                 "alpha_topk": args.alpha_topk,
                 "lambda_nll": args.lambda_nll,
                 "lambda_var": args.lambda_var,
+                "ec_delta_max": args.ec_delta_max,
+                "lambda_edge": args.lambda_edge,
+                "lambda_edge_high": args.lambda_edge_high,
+                "lambda_distill": args.lambda_distill,
+                "lambda_delta": args.lambda_delta,
+                "ec_teacher_epochs": args.ec_teacher_epochs,
                 "gamma_unc": args.gamma_unc,
                 "topk_frac": args.topk_frac,
                 "stage1_epochs": args.stage1_epochs,

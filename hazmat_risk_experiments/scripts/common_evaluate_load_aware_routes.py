@@ -109,6 +109,7 @@ def metrics(graph, inst, sequences: list[list[int]]) -> dict[str, float]:
     return {
         "load_global_risk": float(all_risks.sum()),
         "load_cvar90": pyvrp_eval.cvar(all_risks, 0.90),
+        "load_cvar95": pyvrp_eval.cvar(all_risks, 0.95),
         "load_max_vehicle_risk": float(vehicle_risks.max()) if vehicle_risks.size else 0.0,
         "load_vehicle_gini": pyvrp_eval.gini(vehicle_risks),
         "load_edge_burden_gini_used": pyvrp_eval.gini(burdens),
@@ -121,6 +122,7 @@ def summarize(rows: list[dict[str, object]]) -> list[dict[str, object]]:
     metric_names = [
         "load_global_risk",
         "load_cvar90",
+        "load_cvar95",
         "load_max_vehicle_risk",
         "load_vehicle_gini",
         "load_edge_burden_gini_used",

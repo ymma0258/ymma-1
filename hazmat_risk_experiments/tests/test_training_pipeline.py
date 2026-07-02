@@ -14,6 +14,8 @@ SCRIPT_DIR = Path(__file__).resolve().parents[1] / "scripts"
 sys.path.insert(0, str(SCRIPT_DIR))
 
 import train_risk_model as training  # noqa: E402
+import evaluate_route_pool_budget as budget_eval  # noqa: E402
+import export_tail_enhanced_risk_matrix as tail_export  # noqa: E402
 
 
 def graph(year: str, labels: list[int]) -> training.GraphData:
@@ -34,6 +36,87 @@ def graph(year: str, labels: list[int]) -> training.GraphData:
 
 
 class TrainingPipelineTests(unittest.TestCase):
+    def test_tail_score_uses_high_risk_probability_and_clips(self) -> None:
+        scores = np.asarray([0.10, 0.90])
+        p_high = np.asarray([0.40, 0.80])
+        actual = tail_export.tail_node_scores(scores, p_high, eta=0.5)
+        np.testing.assert_allclose(actual, np.asarray([0.30, 1.00]))
+
+    def test_ranking_metrics_reward_high_risk_ordering(self) -> None:
+        labels = np.asarray([1, 2, 3, 4, 5, 6, 7, 8, 6, 7])
+        scores = labels.astype(float)
+        metrics = training.ranking_metrics(labels, scores)
+        self.assertEqual(metrics["high_risk_recall_at_top20pct"], 0.4)
+        self.assertAlmostEqual(metrics["ndcg_at_top20pct"], 1.0)
+        self.assertEqual(metrics["high_risk_hits_at_10"], 5.0)
+
+    def test_budget_selection_uses_shared_shortest_route_baseline(self) -> None:
+        rows = [
+            {
+                "risk_source": "M0",
+                "customer_set": "A",
+                "seed": 0,
+                "beta": 0.0,
+                "lambda_concentration": 0.0,
+                "pyvrp_cost": 100.0,
+                "common_global_risk": 10.0,
+                "common_global_cvar90": 5.0,
+                "common_global_cvar95": 6.0,
+                "load_global_risk": 8.0,
+                "load_cvar90": 4.0,
+                "common_edge_burden_gini_used": 0.5,
+                "common_top10_burden_share": 0.4,
+            },
+            {
+                "risk_source": "M0",
+                "customer_set": "A",
+                "seed": 0,
+                "beta": 1.0,
+                "lambda_concentration": 0.0,
+                "pyvrp_cost": 125.0,
+                "common_global_risk": 4.0,
+                "common_global_cvar90": 2.0,
+                "common_global_cvar95": 3.0,
+                "load_global_risk": 3.0,
+                "load_cvar90": 2.0,
+                "common_edge_burden_gini_used": 0.3,
+                "common_top10_burden_share": 0.2,
+            },
+        ]
+        candidates = budget_eval.assign_cost_increase(rows)
+        selected = budget_eval.budget_metric_best(candidates, [0.20, 0.25])
+        risk_at_20 = next(
+            row for row in selected if row["budget"] == 0.20 and row["selector"] == "common_risk"
+        )
+        risk_at_25 = next(
+            row for row in selected if row["budget"] == 0.25 and row["selector"] == "common_risk"
+        )
+        self.assertEqual(risk_at_20["selected_value"], 10.0)
+        self.assertEqual(risk_at_25["selected_value"], 4.0)
+
+    def test_rerank_score_uses_pool_normalization_for_all_budgets(self) -> None:
+        rows = []
+        for cost, risk in [(100.0, 10.0), (125.0, 5.0), (130.0, 0.0)]:
+            rows.append(
+                {
+                    "risk_source": "M0",
+                    "customer_set": "A",
+                    "seed": 0,
+                    "pyvrp_cost": cost,
+                    "cost_increase_pct": cost / 100.0 - 1.0,
+                    "common_global_risk": risk,
+                    "common_global_cvar90": risk,
+                    "load_global_risk": risk,
+                    "common_top10_burden_share": risk / 10.0,
+                }
+            )
+        weights = {"cost": 1.0, "common_risk": 0.0, "cvar90": 0.0, "load_risk": 0.0, "top10_share": 0.0}
+        selected = budget_eval.rerank_pool(rows, [0.25, 0.30], weights)
+        by_budget = {row["budget"]: row for row in selected}
+        self.assertEqual(by_budget[0.25]["pyvrp_cost"], 100.0)
+        self.assertEqual(by_budget[0.30]["pyvrp_cost"], 100.0)
+        self.assertEqual(by_budget[0.25]["cost_norm"], by_budget[0.30]["cost_norm"])
+
     def test_split_b_has_disjoint_validation_and_test_sets(self) -> None:
         # Eight samples per class keep every nested stratified subset feasible.
         labels = [level for level in range(1, 9) for _ in range(8)]

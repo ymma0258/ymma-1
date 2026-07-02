@@ -1,0 +1,17 @@
+{
+  "common_risk_dir": "hazmat_risk_experiments\\outputs_10seed\\risk_matrices\\common_ensemble4_10seed_floor_0p01",
+  "budgets": [
+    0.25,
+    0.3
+  ],
+  "objective_weights": {
+    "cost": 1.0,
+    "common_risk": 1.0,
+    "cvar90": 2.0,
+    "load_risk": 1.0,
+    "top10_share": 0.5
+  },
+  "budget_definition": "Risk@B = min(CommonRisk | CostInc <= B)",
+  "rerank_definition": "J = D_norm + beta1*CommonRisk_norm + beta2*CVaR90_norm + beta3*LoadRisk_norm + beta4*Top10Share_norm",
+  "definition": "posterior common/load-aware route-pool reranking; PyVRP optimizer unchanged"
+}

@@ -84,7 +84,9 @@ Important result packages:
 - `export_ensemble_risk_matrix.py`: combines model risk matrices.
 - `export_label_oracle_risk_matrix.py`: creates the label-supported reference.
 - `export_calibrated_risk_matrix.py`: exploratory calibrated edge-risk export.
-- `export_tail_enhanced_risk_matrix.py`: exploratory tail-enhanced scoring.
+- `export_tail_enhanced_risk_matrix.py`: formal tail-enhanced scoring with
+  `S_tail = clip(S_norm + eta * P_high, 0, 1)` and
+  `R_ij,tail = w_ij,floor * max(S_i,tail, S_j,tail)`.
 - `diagnose_risk_matrix.py`: checks zero-risk and distribution diagnostics.
 
 Checkpoint-backed export example:
