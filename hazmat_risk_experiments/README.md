@@ -66,7 +66,8 @@ Important result packages:
 
 ### Node-Risk Models
 
-- `train_risk_model.py`: trains one model.
+- `train_risk_model.py`: trains one model, selects a validation checkpoint,
+  and stores its fitted feature/edge preprocessing state.
 - `run_model_experiments.py`: runs model batches and summarizes metrics.
 - `summarize_model_results.py`: helper for older model-result summaries.
 - `summarize_node_risk_eval_tables.py`: creates paper-ready node-risk tables,
@@ -76,13 +77,29 @@ Important result packages:
 
 ### Risk Matrix Export
 
-- `export_risk_matrix.py`: exports node risk, edge risk, and 5x8 matrix tables.
+- `export_risk_matrix.py`: loads a saved checkpoint and exports node risk,
+  edge risk, and 5x8 matrix tables. It retrains only when the explicit
+  diagnostic flag `--train-before-export` is supplied.
 - `run_risk_matrix_exports.py`: batch wrapper for risk matrix export.
 - `export_ensemble_risk_matrix.py`: combines model risk matrices.
 - `export_label_oracle_risk_matrix.py`: creates the label-supported reference.
 - `export_calibrated_risk_matrix.py`: exploratory calibrated edge-risk export.
-- `export_tail_enhanced_risk_matrix.py`: exploratory tail-enhanced scoring.
+- `export_tail_enhanced_risk_matrix.py`: formal tail-enhanced scoring with
+  `S_tail = clip(S_norm + eta * P_high, 0, 1)` and
+  `R_ij,tail = w_ij,floor * max(S_i,tail, S_j,tail)`.
 - `diagnose_risk_matrix.py`: checks zero-risk and distribution diagnostics.
+
+Checkpoint-backed export example:
+
+```powershell
+.\PyVRP-main\.venv\Scripts\python.exe -B .\hazmat_risk_experiments\scripts\train_risk_model.py --zip D:\城市危险化学品运输车辆轨迹数据.zip --output-dir .\hazmat_risk_experiments\outputs_10seed\models --model gcn_teg_concat --split B --seed 0 --epochs 50
+.\PyVRP-main\.venv\Scripts\python.exe -B .\hazmat_risk_experiments\scripts\export_risk_matrix.py --zip D:\城市危险化学品运输车辆轨迹数据.zip --checkpoint .\hazmat_risk_experiments\outputs_10seed\models\checkpoints\gcn_teg_concat_splitB_seed0_epochs50.pt --output-dir .\hazmat_risk_experiments\outputs_10seed\risk_matrices --risk-mode exposure_floor --exposure-delta 0.01
+```
+
+New Split B runs reserve 20% of the 2021 adaptation pool for validation and
+select the epoch maximizing `-MAE + 0.8 * PR-AUC`. The historical no-validation
+behaviour is available only with `--split-b-val-fraction 0` and
+`--checkpoint-selection last`.
 
 ### OD Path Validation
 

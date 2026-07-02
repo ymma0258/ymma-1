@@ -1,0 +1,31 @@
+{
+  "models": [
+    "gcn_teg_concat"
+  ],
+  "splits": [
+    "B"
+  ],
+  "seeds": [
+    0,
+    1,
+    2
+  ],
+  "epochs": 50,
+  "experiment_tag": "st_v1_3seed",
+  "alpha_ord": 0.3,
+  "alpha_hr": 0.5,
+  "alpha_topk": 0.1,
+  "lambda_nll": 0.0,
+  "lambda_var": 0.0,
+  "gamma_unc": 0.5,
+  "topk_frac": 0.2,
+  "stage1_epochs": 0,
+  "split_b_val_fraction": 0.0,
+  "checkpoint_selection": "last",
+  "gate_normalized": false,
+  "feature_standardization": false,
+  "edge_normalization": "per_year",
+  "elapsed_seconds": 70.0264265537262,
+  "num_metric_rows": 9,
+  "num_failures": 0
+}

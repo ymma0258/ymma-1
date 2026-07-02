@@ -1,0 +1,213 @@
+{
+  "model": "gcn_teg_concat",
+  "split": "B",
+  "seed": 4,
+  "epochs": 50,
+  "risk_mode": "exposure_floor",
+  "exposure_delta": 0.01,
+  "uncertainty_tau": 0.0,
+  "experiment_tag": "st_v1_formal_10seed",
+  "checkpoint_path": "D:\\PyVRP-main\\hazmat_risk_experiments\\outputs_10seed\\st_v1_formal_10seed\\models\\checkpoints\\gcn_teg_concat_splitB_seed4_epochs50_st_v1_formal_10seed.pt",
+  "best_epoch": 50,
+  "model_source": "checkpoint",
+  "alpha_ord": 0.5,
+  "alpha_hr": 1.0,
+  "alpha_topk": 0.3,
+  "lambda_nll": 0.0,
+  "lambda_var": 0.0,
+  "ec_delta_max": 0.05,
+  "lambda_edge": 0.0,
+  "lambda_edge_high": 0.0,
+  "lambda_distill": 0.0,
+  "lambda_delta": 0.0,
+  "ec_teacher_epochs": 50,
+  "gamma_unc": 0.5,
+  "logvar_min": -5.0,
+  "logvar_max": 2.0,
+  "metrics": {
+    "data_2020_train": {
+      "macro_f1": 0.4443261454465125,
+      "weighted_f1": 0.7333884105432714,
+      "mae": 0.7303692697081628,
+      "qwk": 0.7112038701116328,
+      "recall_6_8": 0.8,
+      "precision_6_8": 0.7272727272727273,
+      "pr_auc_high": 0.8835753141620363,
+      "high_fn_rate": 0.2,
+      "brier": 0.31915920972824097,
+      "ece": 0.07638767290513669
+    },
+    "data_2021_train": {
+      "macro_f1": 0.5174731085843256,
+      "weighted_f1": 0.770493465875132,
+      "mae": 0.6303654831193772,
+      "qwk": 0.7454102855474818,
+      "recall_6_8": 0.8,
+      "precision_6_8": 0.8,
+      "pr_auc_high": 0.9250818022706568,
+      "high_fn_rate": 0.2,
+      "brier": 0.26333245635032654,
+      "ece": 0.08838318585000966
+    },
+    "data_2021_test": {
+      "macro_f1": 0.31579677239694215,
+      "weighted_f1": 0.6155844380236005,
+      "mae": 1.2170471331118349,
+      "qwk": 0.3036142609527923,
+      "recall_6_8": 0.3076923076923077,
+      "precision_6_8": 0.47058823529411764,
+      "pr_auc_high": 0.4352692508810207,
+      "high_fn_rate": 0.6923076923076923,
+      "brier": 0.46706053614616394,
+      "ece": 0.07815785148927759
+    }
+  },
+  "split_sizes": {
+    "data_2020": {
+      "train": 419,
+      "val": 0,
+      "test": 0
+    },
+    "data_2021": {
+      "train": 221,
+      "val": 0,
+      "test": 222
+    }
+  },
+  "risk_summaries": {
+    "data_2020": {
+      "edge_count": 6603,
+      "risk_min": 5.108969247658024e-09,
+      "risk_max": 0.9131183624267578,
+      "risk_mean": 0.019630303606390953,
+      "risk_p25": 0.0008398311329074204,
+      "risk_p50": 0.0018447936745360494,
+      "risk_p75": 0.003982025198638439,
+      "risk_p90": 0.00867845956236124,
+      "risk_p95": 0.08537369966506958,
+      "risk_p99": 0.4382622241973877,
+      "zero_risk_edge_count": 0,
+      "zero_risk_edge_ratio": 0.0,
+      "edge_attribute_zero_ratio": 0.928365894290474,
+      "matrix_5x8": [
+        [
+          0,
+          605,
+          394,
+          165,
+          38,
+          25,
+          21,
+          73
+        ],
+        [
+          0,
+          608,
+          324,
+          124,
+          75,
+          21,
+          41,
+          128
+        ],
+        [
+          0,
+          558,
+          311,
+          210,
+          84,
+          43,
+          47,
+          67
+        ],
+        [
+          0,
+          563,
+          344,
+          186,
+          36,
+          46,
+          66,
+          80
+        ],
+        [
+          0,
+          513,
+          398,
+          174,
+          64,
+          26,
+          43,
+          102
+        ]
+      ]
+    },
+    "data_2021": {
+      "edge_count": 7647,
+      "risk_min": 1.19209286886246e-09,
+      "risk_max": 0.901222288608551,
+      "risk_mean": 0.01812211610376835,
+      "risk_p25": 0.000880397972650826,
+      "risk_p50": 0.0018748214934021235,
+      "risk_p75": 0.003694303333759308,
+      "risk_p90": 0.008579960092902184,
+      "risk_p95": 0.07173348218202591,
+      "risk_p99": 0.43328800797462463,
+      "zero_risk_edge_count": 0,
+      "zero_risk_edge_ratio": 0.0,
+      "edge_attribute_zero_ratio": 0.9314763959722767,
+      "matrix_5x8": [
+        [
+          0,
+          681,
+          529,
+          185,
+          49,
+          15,
+          30,
+          41
+        ],
+        [
+          0,
+          742,
+          340,
+          166,
+          71,
+          71,
+          45,
+          94
+        ],
+        [
+          0,
+          649,
+          408,
+          207,
+          69,
+          92,
+          44,
+          61
+        ],
+        [
+          0,
+          609,
+          378,
+          176,
+          91,
+          143,
+          81,
+          51
+        ],
+        [
+          0,
+          570,
+          485,
+          178,
+          69,
+          88,
+          54,
+          85
+        ]
+      ]
+    }
+  }
+}

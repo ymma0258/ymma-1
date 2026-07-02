@@ -1,0 +1,213 @@
+{
+  "model": "gcn_teg_concat",
+  "split": "B",
+  "seed": 6,
+  "epochs": 50,
+  "risk_mode": "exposure_floor",
+  "exposure_delta": 0.01,
+  "uncertainty_tau": 0.0,
+  "experiment_tag": "st_v1_formal_10seed",
+  "checkpoint_path": "D:\\PyVRP-main\\hazmat_risk_experiments\\outputs_10seed\\st_v1_formal_10seed\\models\\checkpoints\\gcn_teg_concat_splitB_seed6_epochs50_st_v1_formal_10seed.pt",
+  "best_epoch": 50,
+  "model_source": "checkpoint",
+  "alpha_ord": 0.5,
+  "alpha_hr": 1.0,
+  "alpha_topk": 0.3,
+  "lambda_nll": 0.0,
+  "lambda_var": 0.0,
+  "ec_delta_max": 0.05,
+  "lambda_edge": 0.0,
+  "lambda_edge_high": 0.0,
+  "lambda_distill": 0.0,
+  "lambda_delta": 0.0,
+  "ec_teacher_epochs": 50,
+  "gamma_unc": 0.5,
+  "logvar_min": -5.0,
+  "logvar_max": 2.0,
+  "metrics": {
+    "data_2020_train": {
+      "macro_f1": 0.45293480134495795,
+      "weighted_f1": 0.7083792035568613,
+      "mae": 0.8532288228384818,
+      "qwk": 0.602293634643765,
+      "recall_6_8": 0.65,
+      "precision_6_8": 0.6341463414634146,
+      "pr_auc_high": 0.7297473868821533,
+      "high_fn_rate": 0.35,
+      "brier": 0.3448483347892761,
+      "ece": 0.06796177382400896
+    },
+    "data_2021_train": {
+      "macro_f1": 0.6300979547972819,
+      "weighted_f1": 0.7630232625710783,
+      "mae": 0.7276130355898537,
+      "qwk": 0.6933016032064128,
+      "recall_6_8": 0.8,
+      "precision_6_8": 0.7142857142857143,
+      "pr_auc_high": 0.8471813103037162,
+      "high_fn_rate": 0.2,
+      "brier": 0.2894752025604248,
+      "ece": 0.09581944346427916
+    },
+    "data_2021_test": {
+      "macro_f1": 0.25654358338801,
+      "weighted_f1": 0.5983968075387481,
+      "mae": 1.2199745197021008,
+      "qwk": 0.3424885142655195,
+      "recall_6_8": 0.34615384615384615,
+      "precision_6_8": 0.4090909090909091,
+      "pr_auc_high": 0.30613280469884274,
+      "high_fn_rate": 0.6538461538461539,
+      "brier": 0.4951474964618683,
+      "ece": 0.06570942605937924
+    }
+  },
+  "split_sizes": {
+    "data_2020": {
+      "train": 419,
+      "val": 0,
+      "test": 0
+    },
+    "data_2021": {
+      "train": 221,
+      "val": 0,
+      "test": 222
+    }
+  },
+  "risk_summaries": {
+    "data_2020": {
+      "edge_count": 6603,
+      "risk_min": 3.4059796649721363e-10,
+      "risk_max": 0.8445019721984863,
+      "risk_mean": 0.0190961305052042,
+      "risk_p25": 0.0008116678800433874,
+      "risk_p50": 0.001727955648675561,
+      "risk_p75": 0.003988421987742186,
+      "risk_p90": 0.008225612342357635,
+      "risk_p95": 0.07319159805774689,
+      "risk_p99": 0.42231160402297974,
+      "zero_risk_edge_count": 0,
+      "zero_risk_edge_ratio": 0.0,
+      "edge_attribute_zero_ratio": 0.928365894290474,
+      "matrix_5x8": [
+        [
+          0,
+          663,
+          359,
+          140,
+          51,
+          45,
+          63,
+          0
+        ],
+        [
+          0,
+          626,
+          272,
+          132,
+          81,
+          74,
+          135,
+          1
+        ],
+        [
+          0,
+          576,
+          306,
+          154,
+          95,
+          78,
+          111,
+          0
+        ],
+        [
+          0,
+          609,
+          283,
+          134,
+          89,
+          93,
+          113,
+          0
+        ],
+        [
+          0,
+          597,
+          322,
+          118,
+          102,
+          65,
+          115,
+          1
+        ]
+      ]
+    },
+    "data_2021": {
+      "edge_count": 7647,
+      "risk_min": 0.0,
+      "risk_max": 0.8452827334403992,
+      "risk_mean": 0.016727058216929436,
+      "risk_p25": 0.000831054407171905,
+      "risk_p50": 0.0016856471775099635,
+      "risk_p75": 0.004008123185485601,
+      "risk_p90": 0.00759237352758646,
+      "risk_p95": 0.05861416459083557,
+      "risk_p99": 0.4144364893436432,
+      "zero_risk_edge_count": 6,
+      "zero_risk_edge_ratio": 0.0007846214201647705,
+      "edge_attribute_zero_ratio": 0.9314763959722767,
+      "matrix_5x8": [
+        [
+          1,
+          783,
+          467,
+          123,
+          67,
+          32,
+          57,
+          0
+        ],
+        [
+          2,
+          755,
+          348,
+          124,
+          103,
+          86,
+          111,
+          0
+        ],
+        [
+          0,
+          703,
+          374,
+          167,
+          100,
+          81,
+          104,
+          1
+        ],
+        [
+          0,
+          680,
+          316,
+          151,
+          134,
+          138,
+          99,
+          11
+        ],
+        [
+          3,
+          672,
+          424,
+          111,
+          94,
+          103,
+          119,
+          3
+        ]
+      ]
+    }
+  }
+}

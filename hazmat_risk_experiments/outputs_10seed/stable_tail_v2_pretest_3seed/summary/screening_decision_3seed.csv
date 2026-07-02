@@ -1,0 +1,5 @@
+configuration,passed,passed_count,criterion_count,failed_criteria
+st_v1,False,11,13,P95>=0.075; SetB_Risk<4.0353
+st_v1_best,False,4,13,P95>=0.075; P99>=0.420; TailGap>=0.350; ODRisk>=0.8501; ODCVaR90>=0.9005; ODMaxRisk>=0.9078; SetA_Risk<3.1467; SetB_Risk<4.0353; SetB_Gini<=0.7777
+st_v2,False,2,13,MAE<=1.2089; PR-AUC>=0.3716; P95>=0.075; P99>=0.420; TailGap>=0.350; ODRisk>=0.8501; ODCVaR90>=0.9005; ODMaxRisk>=0.9078; SetA_Risk<3.1467; SetB_Risk<4.0353; SetB_Gini<=0.7777
+st_v2_std,False,1,13,MAE<=1.2089; PR-AUC>=0.3716; P95>=0.075; P99>=0.420; TailGap>=0.350; ODRisk>=0.8501; ODCVaR90>=0.9005; ODMaxRisk>=0.9078; SetA_Risk<3.1467; SetB_Risk<4.0353; SetA_Gini<=0.7546; SetB_Gini<=0.7777

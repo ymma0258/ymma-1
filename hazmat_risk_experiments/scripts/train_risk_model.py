@@ -22,6 +22,7 @@ experiments.
 from __future__ import annotations
 
 import argparse
+import copy
 import csv
 import io
 import json
@@ -62,6 +63,17 @@ class GraphData:
     edge_index: torch.Tensor
     edge_weight: torch.Tensor
     labeled_idx: np.ndarray
+
+
+@dataclass
+class PreprocessingState:
+    """Training-fitted transforms reused verbatim during checkpoint export."""
+
+    edge_mode: str
+    edge_min: float | None = None
+    edge_p99: float | None = None
+    feature_mean: torch.Tensor | None = None
+    feature_std: torch.Tensor | None = None
 
 
 def parse_args() -> argparse.Namespace:
@@ -125,6 +137,43 @@ def parse_args() -> argparse.Namespace:
         default=0,
         help="Epochs using CE + 0.5 ordinal loss before full loss.",
     )
+    parser.add_argument(
+        "--split-b-val-fraction",
+        type=float,
+        default=0.2,
+        help="Fraction of Split B's 2021 adaptation pool reserved for validation.",
+    )
+    parser.add_argument(
+        "--checkpoint-selection",
+        choices=["best", "last"],
+        default="best",
+        help="Select the best validation epoch or preserve legacy last-epoch behaviour.",
+    )
+    parser.add_argument("--checkpoint-score-pr-weight", type=float, default=0.8)
+    parser.add_argument("--checkpoint-min-recall", type=float, default=0.0)
+    parser.add_argument("--checkpoint-max-high-fn", type=float, default=1.0)
+    parser.add_argument(
+        "--checkpoint-dir",
+        type=Path,
+        default=None,
+        help="Checkpoint directory; defaults to OUTPUT_DIR/checkpoints.",
+    )
+    parser.add_argument(
+        "--gate-normalized",
+        action="store_true",
+        help="Include the scalar TEG gate in neighbour normalization (ST-v2).",
+    )
+    parser.add_argument(
+        "--feature-standardization",
+        action="store_true",
+        help="Fit feature mean/std on training nodes and apply it to both years.",
+    )
+    parser.add_argument(
+        "--edge-normalization",
+        choices=["per_year", "shared_2020", "shared_train"],
+        default="per_year",
+        help="Exposure scaling policy. per_year preserves the legacy model.",
+    )
     return parser.parse_args()
 
 
@@ -168,21 +217,33 @@ def merge_undirected_max(
     )
 
 
+def fit_edge_weight_scaler(weights: np.ndarray) -> tuple[float, float]:
+    values = weights.astype(np.float32)
+    p99 = float(np.percentile(values, 99))
+    return float(np.min(np.minimum(values, p99))), p99
+
+
+def transform_edge_weight(weights: np.ndarray, min_val: float, p99: float) -> np.ndarray:
+    capped = np.minimum(weights.astype(np.float32), p99)
+    return np.clip((capped - min_val) / (p99 - min_val + EPS), 0.0, 1.0)
+
+
 def normalize_edge_weight(weights: np.ndarray) -> np.ndarray:
-    capped = np.minimum(weights.astype(np.float32), np.percentile(weights, 99))
-    min_val = float(np.min(capped))
-    max_val = float(np.max(capped))
-    return (capped - min_val) / (max_val - min_val + EPS)
+    min_val, p99 = fit_edge_weight_scaler(weights)
+    return transform_edge_weight(weights, min_val, p99)
 
 
-def load_graph(zf: zipfile.ZipFile, year: str) -> GraphData:
+def load_graph(
+    zf: zipfile.ZipFile, year: str, *, normalize_edges: bool = True
+) -> GraphData:
     x = read_npy(zf, year, "data.x.npy").astype(np.float32)
     y = read_npy(zf, year, "data.y.npy").astype(np.int64)
     edge_index = read_npy(zf, year, "data.edge_index.npy")
     edge_attr = read_npy(zf, year, "data.edge_attribute.npy")
 
     undirected_edges, undirected_weights = merge_undirected_max(edge_index, edge_attr)
-    undirected_weights = normalize_edge_weight(undirected_weights)
+    if normalize_edges:
+        undirected_weights = normalize_edge_weight(undirected_weights)
     labeled_idx = np.flatnonzero(y > 0)
 
     return GraphData(
@@ -207,7 +268,11 @@ def stratified_split(
 
 
 def build_splits(
-    graph20: GraphData, graph21: GraphData, split: str, seed: int
+    graph20: GraphData,
+    graph21: GraphData,
+    split: str,
+    seed: int,
+    split_b_val_fraction: float = 0.2,
 ) -> dict[str, dict[str, np.ndarray]]:
     y20 = graph20.y.numpy()
     y21 = graph21.y.numpy()
@@ -224,7 +289,18 @@ def build_splits(
         }
 
     if split == "B":
-        train21, test21 = stratified_split(graph21.labeled_idx, y21, 0.5, seed)
+        adapt21, test21 = stratified_split(graph21.labeled_idx, y21, 0.5, seed)
+        if not 0.0 <= split_b_val_fraction < 1.0:
+            raise ValueError("split_b_val_fraction must be in [0, 1)")
+        if split_b_val_fraction == 0.0:
+            # Explicit compatibility mode for reproducing the historical
+            # last-epoch Split B baseline. Formal new runs should use 0.2.
+            train21 = adapt21
+            val21 = np.array([], dtype=int)
+        else:
+            train21, val21 = stratified_split(
+                adapt21, y21, split_b_val_fraction, seed
+            )
         return {
             "data_2020": {
                 "train": graph20.labeled_idx,
@@ -233,7 +309,7 @@ def build_splits(
             },
             "data_2021": {
                 "train": train21,
-                "val": np.array([], dtype=int),
+                "val": val21,
                 "test": test21,
             },
         }
@@ -251,6 +327,94 @@ def build_splits(
             "test": test21,
         },
     }
+
+
+def _training_edge_weights(
+    graph: GraphData, train_idx: np.ndarray
+) -> np.ndarray:
+    """Select edges touching at least one training node for scaler fitting."""
+
+    if train_idx.size == 0:
+        return np.array([], dtype=np.float32)
+    train_mask = np.zeros(graph.x.shape[0], dtype=bool)
+    train_mask[train_idx] = True
+    edges = graph.edge_index.numpy()
+    keep = train_mask[edges[0]] | train_mask[edges[1]]
+    return graph.edge_weight.numpy()[keep]
+
+
+def fit_and_apply_preprocessing(
+    graphs: list[GraphData],
+    split_map: dict[str, dict[str, np.ndarray]],
+    edge_mode: str,
+    standardize_features: bool,
+) -> PreprocessingState:
+    """Fit preprocessing using training information and transform both graphs."""
+
+    state = PreprocessingState(edge_mode=edge_mode)
+    if edge_mode == "per_year":
+        for graph in graphs:
+            graph.edge_weight = torch.from_numpy(
+                normalize_edge_weight(graph.edge_weight.numpy())
+            ).float()
+    else:
+        if edge_mode == "shared_2020":
+            fit_weights = graphs[0].edge_weight.numpy()
+        elif edge_mode == "shared_train":
+            selected = [
+                _training_edge_weights(graph, split_map[graph.year]["train"])
+                for graph in graphs
+            ]
+            selected = [values for values in selected if values.size]
+            if not selected:
+                raise ValueError("No training-connected edges available for scaling")
+            fit_weights = np.concatenate(selected)
+        else:
+            raise ValueError(f"Unknown edge normalization mode: {edge_mode}")
+        state.edge_min, state.edge_p99 = fit_edge_weight_scaler(fit_weights)
+        for graph in graphs:
+            graph.edge_weight = torch.from_numpy(
+                transform_edge_weight(
+                    graph.edge_weight.numpy(), state.edge_min, state.edge_p99
+                )
+            ).float()
+
+    if standardize_features:
+        train_features = [
+            graph.x[torch.from_numpy(split_map[graph.year]["train"]).long()]
+            for graph in graphs
+            if split_map[graph.year]["train"].size
+        ]
+        fitted = torch.cat(train_features, dim=0)
+        state.feature_mean = fitted.mean(dim=0)
+        state.feature_std = fitted.std(dim=0, unbiased=False).clamp_min(1e-6)
+        for graph in graphs:
+            graph.x = (graph.x - state.feature_mean) / state.feature_std
+    return state
+
+
+def apply_preprocessing_state(
+    graphs: list[GraphData], state: PreprocessingState
+) -> None:
+    """Apply a checkpoint's fitted transforms without refitting on export data."""
+
+    if state.edge_mode == "per_year":
+        for graph in graphs:
+            graph.edge_weight = torch.from_numpy(
+                normalize_edge_weight(graph.edge_weight.numpy())
+            ).float()
+    else:
+        if state.edge_min is None or state.edge_p99 is None:
+            raise ValueError("Shared edge scaler is missing from checkpoint")
+        for graph in graphs:
+            graph.edge_weight = torch.from_numpy(
+                transform_edge_weight(
+                    graph.edge_weight.numpy(), state.edge_min, state.edge_p99
+                )
+            ).float()
+    if state.feature_mean is not None and state.feature_std is not None:
+        for graph in graphs:
+            graph.x = (graph.x - state.feature_mean) / state.feature_std
 
 
 def normalize_messages(
@@ -285,8 +449,9 @@ class GraphConv(nn.Module):
 
 
 class EdgeGatedConv(nn.Module):
-    def __init__(self, dim: int) -> None:
+    def __init__(self, dim: int, gate_normalized: bool = False) -> None:
         super().__init__()
+        self.gate_normalized = gate_normalized
         self.msg = nn.Linear(dim, dim)
         self.edge_gate = nn.Linear(1, dim)
         self.node_gate = nn.Linear(2 * dim, dim)
@@ -307,8 +472,17 @@ class EdgeGatedConv(nn.Module):
                 torch.clamp(node_reliability[src] * node_reliability[dst], min=EPS)
             )
             gate = gate * edge_reliability.unsqueeze(1)
-        norm = normalize_messages(x.shape[0], edge_index, edge_weight)
-        msg = gate * self.msg(x[src]) * norm.unsqueeze(1)
+        if self.gate_normalized:
+            # A scalar gate participates in neighbour normalization, matching
+            # the exposure-gated attention interpretation used by ST-v2.
+            gate_scalar = gate.mean(dim=1)
+            norm = normalize_messages(
+                x.shape[0], edge_index, edge_weight * gate_scalar
+            )
+            msg = self.msg(x[src]) * norm.unsqueeze(1)
+        else:
+            norm = normalize_messages(x.shape[0], edge_index, edge_weight)
+            msg = gate * self.msg(x[src]) * norm.unsqueeze(1)
         out = torch.zeros_like(msg.new_zeros((x.shape[0], msg.shape[1])))
         out.index_add_(0, dst, msg)
         return out
@@ -355,6 +529,7 @@ class RiskModel(nn.Module):
         logvar_min: float = -5.0,
         logvar_max: float = 2.0,
         ec_delta_max: float = 0.05,
+        gate_normalized: bool = False,
     ) -> None:
         super().__init__()
         self.model = model
@@ -384,7 +559,12 @@ class RiskModel(nn.Module):
         elif model == "edge_gat":
             self.layers = nn.ModuleList([EdgeGATConv(hidden_dim), EdgeGATConv(hidden_dim)])
         elif model == "teg_gnn":
-            self.layers = nn.ModuleList([EdgeGatedConv(hidden_dim), EdgeGatedConv(hidden_dim)])
+            self.layers = nn.ModuleList(
+                [
+                    EdgeGatedConv(hidden_dim, gate_normalized),
+                    EdgeGatedConv(hidden_dim, gate_normalized),
+                ]
+            )
         elif model in {
             "gcn_teg_concat",
             "gcn_teg_residual_fixed",
@@ -397,7 +577,10 @@ class RiskModel(nn.Module):
                 [GraphConv(hidden_dim, weighted=False), GraphConv(hidden_dim, weighted=False)]
             )
             self.teg_layers = nn.ModuleList(
-                [EdgeGatedConv(hidden_dim), EdgeGatedConv(hidden_dim)]
+                [
+                    EdgeGatedConv(hidden_dim, gate_normalized),
+                    EdgeGatedConv(hidden_dim, gate_normalized),
+                ]
             )
             self.layers = nn.ModuleList()
             if model in {
@@ -724,6 +907,7 @@ def train_stable_tail_teacher(
         graphs[0].x.shape[1],
         args.hidden_dim,
         args.dropout,
+        gate_normalized=getattr(args, "gate_normalized", False),
     )
     optimizer = torch.optim.AdamW(
         teacher.parameters(), lr=args.lr, weight_decay=args.weight_decay
@@ -768,6 +952,36 @@ def expected_calibration_error(
             continue
         ece += float(mask.mean() * abs(correct[mask].mean() - confidences[mask].mean()))
     return ece
+
+
+def ranking_metrics(y_true: np.ndarray, scores: np.ndarray) -> dict[str, float]:
+    """Compute high-risk retrieval metrics used by downstream ranking tasks."""
+
+    if y_true.size == 0:
+        return {}
+    order = np.argsort(-scores, kind="stable")
+    high = y_true >= 6
+    high_count = max(1, int(high.sum()))
+
+    def top_count(fraction: float) -> int:
+        return min(y_true.size, max(1, int(math.ceil(y_true.size * fraction))))
+
+    top10 = order[: top_count(0.10)]
+    top20 = order[: top_count(0.20)]
+    cutoff = top_count(0.20)
+    relevance = np.power(2.0, y_true.astype(float) - 1.0) - 1.0
+    discounts = 1.0 / np.log2(np.arange(2, cutoff + 2, dtype=float))
+    dcg = float(np.sum(relevance[order[:cutoff]] * discounts))
+    ideal = np.argsort(-relevance, kind="stable")[:cutoff]
+    ideal_dcg = float(np.sum(relevance[ideal] * discounts))
+
+    return {
+        "high_risk_recall_at_top10pct": float(high[top10].sum() / high_count),
+        "high_risk_recall_at_top20pct": float(high[top20].sum() / high_count),
+        "ndcg_at_top20pct": dcg / ideal_dcg if ideal_dcg > 0 else 0.0,
+        "high_risk_hits_at_10": float(high[order[: min(10, y_true.size)]].sum()),
+        "high_risk_hits_at_20": float(high[order[: min(20, y_true.size)]].sum()),
+    }
 
 
 def evaluate(
@@ -817,6 +1031,7 @@ def evaluate(
         "brier": brier,
         "ece": ece,
     }
+    result.update(ranking_metrics(y_true, s_pred))
     if log_var is not None:
         lv = log_var[idx_t].detach().numpy()
         sigma = np.sqrt(np.exp(lv))
@@ -834,15 +1049,168 @@ def evaluate(
     return result
 
 
+def evaluate_across_graphs(
+    model: RiskModel,
+    graphs: list[GraphData],
+    split_map: dict[str, dict[str, np.ndarray]],
+    split_name: str,
+) -> dict[str, float]:
+    """Evaluate one logical split jointly across yearly graphs."""
+
+    logits_parts: list[torch.Tensor] = []
+    labels_parts: list[torch.Tensor] = []
+    log_var_parts: list[torch.Tensor] = []
+    has_log_var = False
+    model.eval()
+    with torch.no_grad():
+        for graph in graphs:
+            idx = split_map[graph.year][split_name]
+            if idx.size == 0:
+                continue
+            idx_t = torch.from_numpy(idx).long()
+            logits, log_var = model.forward_outputs(graph)
+            logits_parts.append(logits[idx_t])
+            labels_parts.append(graph.y[idx_t])
+            if log_var is not None:
+                log_var_parts.append(log_var[idx_t])
+                has_log_var = True
+    if not logits_parts:
+        return {}
+    logits_all = torch.cat(logits_parts, dim=0)
+    labels_all = torch.cat(labels_parts, dim=0)
+    log_var_all = torch.cat(log_var_parts, dim=0) if has_log_var else None
+    idx_all = np.arange(labels_all.shape[0], dtype=np.int64)
+    return evaluate(logits_all, labels_all, idx_all, log_var_all)
+
+
+def checkpoint_score(metrics: dict[str, float], args: argparse.Namespace) -> float:
+    """Score validation epochs for ordinal accuracy and high-risk ranking."""
+
+    return -metrics["mae"] + getattr(args, "checkpoint_score_pr_weight", 0.8) * metrics[
+        "pr_auc_high"
+    ]
+
+
+def checkpoint_constraints_hold(
+    metrics: dict[str, float], args: argparse.Namespace
+) -> bool:
+    return (
+        metrics["recall_6_8"] >= getattr(args, "checkpoint_min_recall", 0.0)
+        and metrics["high_fn_rate"] <= getattr(args, "checkpoint_max_high_fn", 1.0)
+    )
+
+
+def checkpoint_stem(args: argparse.Namespace) -> str:
+    stem = f"{args.model}_split{args.split}_seed{args.seed}_epochs{args.epochs}"
+    tag = getattr(args, "experiment_tag", "")
+    return f"{stem}_{tag}" if tag else stem
+
+
+def preprocessing_to_payload(state: PreprocessingState) -> dict[str, object]:
+    return {
+        "edge_mode": state.edge_mode,
+        "edge_min": state.edge_min,
+        "edge_p99": state.edge_p99,
+        "feature_mean": state.feature_mean,
+        "feature_std": state.feature_std,
+    }
+
+
+def preprocessing_from_payload(payload: dict[str, object]) -> PreprocessingState:
+    return PreprocessingState(
+        edge_mode=str(payload["edge_mode"]),
+        edge_min=payload.get("edge_min"),
+        edge_p99=payload.get("edge_p99"),
+        feature_mean=payload.get("feature_mean"),
+        feature_std=payload.get("feature_std"),
+    )
+
+
+def save_checkpoint(
+    args: argparse.Namespace,
+    model: RiskModel,
+    preprocessing: PreprocessingState,
+    split_map: dict[str, dict[str, np.ndarray]],
+    best_epoch: int,
+    validation_metrics: dict[str, float],
+) -> Path:
+    checkpoint_dir = getattr(args, "checkpoint_dir", None) or (
+        args.output_dir / "checkpoints"
+    )
+    checkpoint_dir.mkdir(parents=True, exist_ok=True)
+    path = checkpoint_dir / f"{checkpoint_stem(args)}.pt"
+    torch.save(
+        {
+            "format_version": 1,
+            "model_state_dict": model.state_dict(),
+            "model_config": {
+                "model": args.model,
+                "in_dim": int(model.encoder.in_features),
+                "hidden_dim": args.hidden_dim,
+                "dropout": args.dropout,
+                "gamma_unc": getattr(args, "gamma_unc", 0.5),
+                "logvar_min": getattr(args, "logvar_min", -5.0),
+                "logvar_max": getattr(args, "logvar_max", 2.0),
+                "ec_delta_max": getattr(args, "ec_delta_max", 0.05),
+                "gate_normalized": getattr(args, "gate_normalized", False),
+            },
+            "training_config": {
+                "split": args.split,
+                "seed": args.seed,
+                "epochs": args.epochs,
+                "best_epoch": best_epoch,
+                "split_b_val_fraction": getattr(args, "split_b_val_fraction", 0.2),
+                "checkpoint_selection": getattr(args, "checkpoint_selection", "best"),
+            },
+            "preprocessing": preprocessing_to_payload(preprocessing),
+            "split_map": split_map,
+            "validation_metrics": validation_metrics,
+        },
+        path,
+    )
+    return path
+
+
+def load_checkpoint_model(
+    checkpoint_path: Path, zip_path: Path
+) -> tuple[dict[str, object], RiskModel, list[GraphData]]:
+    """Load exactly one trained model and its fitted preprocessing state."""
+
+    payload = torch.load(checkpoint_path, map_location="cpu", weights_only=False)
+    config = payload["model_config"]
+    model = RiskModel(**config)
+    model.load_state_dict(payload["model_state_dict"])
+    model.eval()
+    with zipfile.ZipFile(zip_path) as zf:
+        graph20 = load_graph(zf, "data_2020", normalize_edges=False)
+        graph21 = load_graph(zf, "data_2021", normalize_edges=False)
+    graphs = [graph20, graph21]
+    apply_preprocessing_state(
+        graphs, preprocessing_from_payload(payload["preprocessing"])
+    )
+    return payload, model, graphs
+
+
 def train(args: argparse.Namespace) -> dict[str, object]:
     set_seed(args.seed)
     with zipfile.ZipFile(args.zip) as zf:
-        graph20 = load_graph(zf, "data_2020")
-        graph21 = load_graph(zf, "data_2021")
+        graph20 = load_graph(zf, "data_2020", normalize_edges=False)
+        graph21 = load_graph(zf, "data_2021", normalize_edges=False)
 
     graphs = [graph20, graph21]
-    by_year = {graph.year: graph for graph in graphs}
-    split_map = build_splits(graph20, graph21, args.split, args.seed)
+    split_map = build_splits(
+        graph20,
+        graph21,
+        args.split,
+        args.seed,
+        getattr(args, "split_b_val_fraction", 0.2),
+    )
+    preprocessing = fit_and_apply_preprocessing(
+        graphs,
+        split_map,
+        getattr(args, "edge_normalization", "per_year"),
+        getattr(args, "feature_standardization", False),
+    )
 
     model = RiskModel(
         args.model,
@@ -853,6 +1221,7 @@ def train(args: argparse.Namespace) -> dict[str, object]:
         getattr(args, "logvar_min", -5.0),
         getattr(args, "logvar_max", 2.0),
         getattr(args, "ec_delta_max", 0.05),
+        getattr(args, "gate_normalized", False),
     )
     weights = class_weights(graphs, split_map)
 
@@ -888,6 +1257,11 @@ def train(args: argparse.Namespace) -> dict[str, object]:
         )
 
     history: list[dict[str, float]] = []
+    best_state: dict[str, torch.Tensor] | None = None
+    best_epoch = args.epochs
+    best_score = -math.inf
+    best_validation: dict[str, float] = {}
+    best_satisfied_constraints = False
     for epoch in range(args.epochs):
         model.train()
         optimizer.zero_grad()
@@ -950,7 +1324,49 @@ def train(args: argparse.Namespace) -> dict[str, object]:
                 )
         total_loss.backward()
         optimizer.step()
-        history.append({"epoch": epoch + 1, "loss": float(total_loss.detach())})
+        row = {"epoch": epoch + 1, "loss": float(total_loss.detach())}
+        validation = evaluate_across_graphs(model, graphs, split_map, "val")
+        if validation:
+            score = checkpoint_score(validation, args)
+            constraints_ok = checkpoint_constraints_hold(validation, args)
+            row.update(
+                {
+                    "val_score": score,
+                    "val_mae": validation["mae"],
+                    "val_pr_auc_high": validation["pr_auc_high"],
+                    "val_recall_6_8": validation["recall_6_8"],
+                    "val_high_fn_rate": validation["high_fn_rate"],
+                }
+            )
+            should_select = score > best_score and (
+                constraints_ok or not best_satisfied_constraints
+            )
+            if constraints_ok and not best_satisfied_constraints:
+                should_select = True
+            if should_select:
+                best_state = copy.deepcopy(model.state_dict())
+                best_epoch = epoch + 1
+                best_score = score
+                best_validation = validation
+                best_satisfied_constraints = constraints_ok
+        history.append(row)
+
+    if (
+        getattr(args, "checkpoint_selection", "best") == "best"
+        and best_state is not None
+    ):
+        model.load_state_dict(best_state)
+    else:
+        best_epoch = args.epochs
+        best_validation = evaluate_across_graphs(model, graphs, split_map, "val")
+        best_score = (
+            checkpoint_score(best_validation, args) if best_validation else -math.inf
+        )
+        best_satisfied_constraints = (
+            checkpoint_constraints_hold(best_validation, args)
+            if best_validation
+            else False
+        )
 
     model.eval()
     metrics: dict[str, dict[str, float]] = {}
@@ -963,6 +1379,9 @@ def train(args: argparse.Namespace) -> dict[str, object]:
                 if result:
                     metrics[f"{graph.year}_{split_name}"] = result
 
+    checkpoint_path = save_checkpoint(
+        args, model, preprocessing, split_map, best_epoch, best_validation
+    )
     return {
         "model": args.model,
         "split": args.split,
@@ -985,6 +1404,16 @@ def train(args: argparse.Namespace) -> dict[str, object]:
         "logvar_max": getattr(args, "logvar_max", 2.0),
         "topk_frac": args.topk_frac,
         "stage1_epochs": args.stage1_epochs,
+        "best_epoch": best_epoch,
+        "checkpoint_path": str(checkpoint_path),
+        "checkpoint_selection": getattr(args, "checkpoint_selection", "best"),
+        "checkpoint_score": best_score if math.isfinite(best_score) else None,
+        "checkpoint_constraints_satisfied": best_satisfied_constraints,
+        "best_validation_metrics": best_validation,
+        "split_b_val_fraction": getattr(args, "split_b_val_fraction", 0.2),
+        "gate_normalized": getattr(args, "gate_normalized", False),
+        "feature_standardization": getattr(args, "feature_standardization", False),
+        "edge_normalization": getattr(args, "edge_normalization", "per_year"),
         "pos_weight": pos_weight,
         "history": history,
         "metrics": metrics,

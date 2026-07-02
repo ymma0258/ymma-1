@@ -1,0 +1,6 @@
+objective,cells,mean_relative_gap_to_cell_best
+J-common,6,0.04223692462259968
+J-common+cvar,6,0.034630529565394634
+J-common+load,6,0.024412248557832694
+J-common+top10,6,0.0345988498207555
+J-full,6,0.01823362742924283
