@@ -1,9 +1,14 @@
 """Create paper-ready node-risk evaluation tables with High FN rate.
 
-The paper uses three explicitly sourced tables: the main comparison, the
-Stable-Tail ablation, and the extended fusion comparison. Keeping their batch
-summaries separate prevents a row from silently being taken from a different
-training configuration.
+The paper uses two related, but not identical, model comparison tables:
+
+* a main node-risk table, where GCN/Weighted-GCN/Edge-GAT are read from the
+  formal baseline run and Stable-Tail GNN is read from the stabilized-TEG run;
+* an ablation table, where all rows come from the stabilized-TEG run so the
+  architecture/loss variants are compared under the same low-tail setting.
+
+Keeping those sources separate avoids silently reporting a low-tail GCN as the
+formal GCN baseline.
 """
 
 from __future__ import annotations
@@ -28,22 +33,39 @@ LEGACY_MODEL_ORDER = [
 ]
 
 MAIN_MODEL_SOURCES = [
+    ("mlp", "MLP", "mlp"),
     ("gcn", "GCN", "formal"),
-    ("gat", "GAT", "formal"),
-    ("graphsage", "GraphSAGE", "formal"),
-    ("sgformer_adapted", "SGFormer-adapted", "strong"),
-    ("gradformer_adapted", "Gradformer-adapted", "strong"),
-    ("stable_tail_gnn", "Stable-Tail GNN", "formal"),
+    ("weighted_gcn", "Weighted-GCN", "formal"),
+    ("edge_gat", "Edge-GAT", "formal"),
+    ("teg_gnn", "TEG-low", "teg_low"),
+    ("gcn_teg_concat", "Stable-Tail GNN", "stable"),
 ]
 
 ABLATION_MODEL_SOURCES = [
-    ("gcn", "GCN-only branch", "formal"),
-    ("teg_only", "TEG-only", "formal"),
-    ("stable_tail_gnn", "Stable-Tail w/o Tail Loss", "stable"),
-    ("stable_tail_gnn", "Stable-Tail GNN", "formal"),
+    ("gcn", "GCN low-tail setting", "stable"),
+    ("teg_gnn", "TEG-low", "stable"),
+    ("gcn_teg_concat", "Stable-Tail GNN", "stable"),
+    ("gcn_teg_residual_fixed", "Residual fixed", "stable"),
+    ("gcn_teg_residual_learnable", "Residual learnable", "stable"),
 ]
 
-EXTENDED_MODEL_SOURCES = [
+PAPER_MAIN_MODEL_SOURCES = [
+    ("gcn", "GCN", "paper"),
+    ("gat", "GAT", "paper"),
+    ("graphsage", "GraphSAGE", "paper"),
+    ("sgformer_adapted", "SGFormer-adapted", "strong"),
+    ("gradformer_adapted", "Gradformer-adapted", "strong"),
+    ("stable_tail_gnn", "Stable-Tail GNN", "paper"),
+]
+
+PAPER_ABLATION_MODEL_SOURCES = [
+    ("gcn", "GCN-only branch", "paper"),
+    ("teg_only", "TEG-only", "paper"),
+    ("stable_tail_gnn", "Stable-Tail w/o Tail Loss", "no_tail"),
+    ("stable_tail_gnn", "Stable-Tail GNN", "paper"),
+]
+
+PAPER_EXTENDED_MODEL_SOURCES = [
     ("graphsage_teg_concat", "GraphSAGE-TEG-Concat", "fusion"),
     ("sgformer_teg_concat", "SGFormer-TEG-Concat", "fusion"),
     ("graphsage_teg_gate", "GraphSAGE-TEG-Gate", "gate"),
@@ -89,6 +111,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--teg-low-source", type=Path)
     parser.add_argument("--stable-source", type=Path)
     parser.add_argument("--mlp-source", type=Path)
+    parser.add_argument("--paper-source", type=Path)
+    parser.add_argument("--no-tail-source", type=Path)
     parser.add_argument("--strong-source", type=Path)
     parser.add_argument("--fusion-source", type=Path)
     parser.add_argument("--gate-source", type=Path)
@@ -226,17 +250,32 @@ def main() -> None:
     args = parse_args()
     suffix = args.suffix
 
-    if any(
-        [
-            args.formal_source,
-            args.stable_source,
-            args.teg_low_source,
-            args.mlp_source,
-            args.strong_source,
-            args.fusion_source,
-            args.gate_source,
-        ]
-    ):
+    if args.paper_source:
+        sources = {
+            "paper": (args.paper_source, row_keyed_by_model(args.paper_source))
+        }
+        if args.no_tail_source:
+            sources["no_tail"] = (
+                args.no_tail_source,
+                row_keyed_by_model(args.no_tail_source),
+            )
+        for key, path in [
+            ("strong", args.strong_source),
+            ("fusion", args.fusion_source),
+            ("gate", args.gate_source),
+        ]:
+            if path:
+                sources[key] = (path, row_keyed_by_model(path))
+        all_rows, split_tables = build_table_from_sources(
+            sources, PAPER_MAIN_MODEL_SOURCES, "paper_main_comparison"
+        )
+        ablation_rows, ablation_tables = build_table_from_sources(
+            sources, PAPER_ABLATION_MODEL_SOURCES, "paper_stable_tail_ablation"
+        )
+        extended_rows, extended_tables = build_table_from_sources(
+            sources, PAPER_EXTENDED_MODEL_SOURCES, "paper_extended_fusion_comparison"
+        )
+    elif args.formal_source or args.stable_source or args.teg_low_source or args.mlp_source:
         sources: dict[str, tuple[Path, dict[tuple[str, str, str], dict[str, str]]]] = {}
         if args.formal_source:
             sources["formal"] = (args.formal_source, row_keyed_by_model(args.formal_source))
@@ -248,12 +287,6 @@ def main() -> None:
             sources["teg_low"] = sources["stable"]
         if args.mlp_source:
             sources["mlp"] = (args.mlp_source, row_keyed_by_model(args.mlp_source))
-        if args.strong_source:
-            sources["strong"] = (args.strong_source, row_keyed_by_model(args.strong_source))
-        if args.fusion_source:
-            sources["fusion"] = (args.fusion_source, row_keyed_by_model(args.fusion_source))
-        if args.gate_source:
-            sources["gate"] = (args.gate_source, row_keyed_by_model(args.gate_source))
 
         all_rows, split_tables = build_table_from_sources(
             sources, MAIN_MODEL_SOURCES, "main_formal_baselines"
@@ -264,9 +297,7 @@ def main() -> None:
             ablation_rows, ablation_tables = build_table_from_sources(
                 sources, ABLATION_MODEL_SOURCES, "stable_tail_ablation"
             )
-        extended_rows, extended_tables = build_table_from_sources(
-            sources, EXTENDED_MODEL_SOURCES, "extended_fusion_comparison"
-        )
+        extended_rows, extended_tables = [], {"A": [], "B": []}
     else:
         all_rows, split_tables = build_legacy_tables(args.source)
         ablation_rows = []
@@ -297,20 +328,9 @@ def main() -> None:
             )
         if extended_rows:
             write_csv(out_dir / f"node_risk_extended_with_high_fn{suffix}.csv", extended_rows)
-            write_csv(
-                out_dir / f"node_risk_extended_splitA_with_high_fn{suffix}.csv",
-                extended_tables["A"],
-            )
-            write_csv(
-                out_dir / f"node_risk_extended_splitB_with_high_fn{suffix}.csv",
-                extended_tables["B"],
-            )
-            write_markdown(
-                out_dir / f"node_risk_extended_with_high_fn{suffix}.md",
-                extended_tables,
-                args.note_label,
-                title_prefix="extended fusion comparison results",
-            )
+            write_csv(out_dir / f"node_risk_extended_splitA_with_high_fn{suffix}.csv", extended_tables["A"])
+            write_csv(out_dir / f"node_risk_extended_splitB_with_high_fn{suffix}.csv", extended_tables["B"])
+            write_markdown(out_dir / f"node_risk_extended_with_high_fn{suffix}.md", extended_tables, args.note_label, title_prefix="extended fusion comparison results")
     print(f"Wrote node-risk evaluation tables to {args.source_out_dir}")
     print(f"Mirrored node-risk evaluation tables to {args.paper_out_dir}")
 

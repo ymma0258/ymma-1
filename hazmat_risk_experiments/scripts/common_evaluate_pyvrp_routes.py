@@ -226,20 +226,32 @@ def main() -> None:
 
     rows: list[dict[str, object]] = []
     failures: list[dict[str, object]] = []
+    instance_cache = {}
     for label, run_dir in run_sources:
         meta = json.loads((run_dir / "pyvrp_cvrp_meta.json").read_text(encoding="utf-8"))
         try:
-            inst = pyvrp_eval.build_instance(
-                graph,
-                scores_norm,
+            customers = tuple(int(node) for node in meta["customers"])
+            cache_key = (
                 int(meta["num_customers"]),
                 int(meta["num_vehicles"]),
                 int(meta["capacity"]),
                 str(meta["customer_set"]),
-                0,
                 int(meta["depot"]),
-                [int(node) for node in meta["customers"]],
+                customers,
             )
+            if cache_key not in instance_cache:
+                instance_cache[cache_key] = pyvrp_eval.build_instance(
+                    graph,
+                    scores_norm,
+                    int(meta["num_customers"]),
+                    int(meta["num_vehicles"]),
+                    int(meta["capacity"]),
+                    str(meta["customer_set"]),
+                    0,
+                    int(meta["depot"]),
+                    list(customers),
+                )
+            inst = instance_cache[cache_key]
             for row in read_csv(run_dir / "pyvrp_cvrp_detail.csv"):
                 row_beta = float(row["beta"])
                 if all(abs(row_beta - beta) > 1e-9 for beta in allowed_betas):

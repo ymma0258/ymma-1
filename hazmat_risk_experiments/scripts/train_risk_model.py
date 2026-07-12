@@ -5,7 +5,8 @@ This script implements the stage-2 experiment scaffold:
 - Load 2020/2021 graph data directly from the zip dataset.
 - Merge directed edges into an undirected graph using max edge exposure.
 - Build split A/B/C masks without treating label 0 as low risk.
-- Train MLP, GCN, Weighted-GCN, or TEG-GNN with CE/ordinal/high-risk/top-k losses.
+- Train MLP, GCN, GAT, GraphSAGE, Weighted-GCN, or TEG-GNN with
+  CE/ordinal/high-risk/top-k losses.
 - Report classification and high-risk metrics.
 - Optionally train uncertainty-aware GNN variants that estimate an ordinal
   risk mean and a per-node predictive variance.
@@ -54,6 +55,52 @@ EPS = 1e-12
 NUM_CLASSES = 8
 RISK_LEVELS = torch.arange(1, NUM_CLASSES + 1, dtype=torch.float32)
 
+# Keep the historical experiment keys loadable: published checkpoints contain
+# these strings in ``model_config``.  The paper-facing aliases below provide
+# unambiguous entries for the new comparison and ablation experiments.
+MODEL_CHOICES = [
+    "mlp",
+    "gcn",
+    "gcn_only",
+    "weighted_gcn",
+    "gat",
+    "edge_gat",
+    "graphsage",
+    "graphsage_teg_concat",
+    "graphsage_teg_gate",
+    "sgformer_adapted",
+    "sgformer_teg_concat",
+    "sgformer_teg_gate",
+    "gradformer_adapted",
+    "teg_gnn",
+    "teg_only",
+    "gcn_teg_concat",
+    "stable_tail_gnn",
+    "gcn_teg_residual_fixed",
+    "gcn_teg_residual_learnable",
+    "ua_gnn",
+    "ua_teg_gnn",
+    "stable_tail_ua_gnn",
+    "stable_tail_ec_gnn",
+]
+
+PAPER_MODEL_NAMES = {
+    "gcn": "GCN",
+    "gcn_only": "GCN-only branch",
+    "gat": "GAT",
+    "graphsage": "GraphSAGE",
+    "graphsage_teg_concat": "GraphSAGE-TEG-Concat",
+    "graphsage_teg_gate": "GraphSAGE-TEG-Gate",
+    "sgformer_adapted": "SGFormer-adapted",
+    "sgformer_teg_concat": "SGFormer-TEG-Concat",
+    "sgformer_teg_gate": "SGFormer-TEG-Gate",
+    "gradformer_adapted": "Gradformer-adapted",
+    "teg_gnn": "TEG-only",
+    "teg_only": "TEG-only",
+    "gcn_teg_concat": "Stable-Tail GNN",
+    "stable_tail_gnn": "Stable-Tail GNN",
+}
+
 
 @dataclass
 class GraphData:
@@ -82,26 +129,15 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--output-dir", type=Path, default=DEFAULT_OUTPUT)
     parser.add_argument(
         "--model",
-        choices=[
-            "mlp",
-            "gcn",
-            "weighted_gcn",
-            "edge_gat",
-            "teg_gnn",
-            "gcn_teg_concat",
-            "gcn_teg_residual_fixed",
-            "gcn_teg_residual_learnable",
-            "ua_gnn",
-            "ua_teg_gnn",
-            "stable_tail_ua_gnn",
-            "stable_tail_ec_gnn",
-        ],
+        choices=MODEL_CHOICES,
         default="teg_gnn",
     )
     parser.add_argument("--split", choices=["A", "B", "C"], default="A")
     parser.add_argument("--epochs", type=int, default=1)
     parser.add_argument("--hidden-dim", type=int, default=64)
     parser.add_argument("--dropout", type=float, default=0.2)
+    parser.add_argument("--gradformer-max-hops", type=int, default=3)
+    parser.add_argument("--gradformer-lambda-init", type=float, default=1.0)
     parser.add_argument("--lr", type=float, default=1e-3)
     parser.add_argument("--weight-decay", type=float, default=1e-4)
     parser.add_argument("--seed", type=int, default=0)
@@ -518,6 +554,187 @@ class EdgeGATConv(nn.Module):
         return out
 
 
+class GATConv(nn.Module):
+    """Single-head graph attention without trajectory-exposure features."""
+
+    def __init__(self, dim: int) -> None:
+        super().__init__()
+        self.linear = nn.Linear(dim, dim, bias=False)
+        self.attn_src = nn.Parameter(torch.empty(dim))
+        self.attn_dst = nn.Parameter(torch.empty(dim))
+        self.bias = nn.Parameter(torch.zeros(dim))
+        nn.init.xavier_uniform_(self.linear.weight)
+        nn.init.xavier_uniform_(self.attn_src.unsqueeze(0))
+        nn.init.xavier_uniform_(self.attn_dst.unsqueeze(0))
+
+    def forward(
+        self, x: torch.Tensor, edge_index: torch.Tensor, edge_weight: torch.Tensor
+    ) -> torch.Tensor:
+        del edge_weight  # Standard GAT is an X + edge_index baseline.
+        src, dst = edge_index
+        h = self.linear(x)
+        scores = F.leaky_relu(
+            (h[src] * self.attn_src).sum(dim=1)
+            + (h[dst] * self.attn_dst).sum(dim=1),
+            negative_slope=0.2,
+        )
+        max_per_dst = torch.full(
+            (x.shape[0],), -torch.inf, dtype=scores.dtype, device=scores.device
+        )
+        max_per_dst.scatter_reduce_(0, dst, scores, reduce="amax", include_self=True)
+        exp_scores = torch.exp(scores - max_per_dst[dst])
+        denom = torch.zeros(x.shape[0], dtype=scores.dtype, device=scores.device)
+        denom.index_add_(0, dst, exp_scores)
+        alpha = exp_scores / (denom[dst] + EPS)
+        out = torch.zeros_like(h)
+        out.index_add_(0, dst, h[src] * alpha.unsqueeze(1))
+        return out + self.bias
+
+
+class GraphSAGEConv(nn.Module):
+    """Full-neighbour mean GraphSAGE layer for the transductive graph."""
+
+    def __init__(self, dim: int) -> None:
+        super().__init__()
+        self.linear = nn.Linear(2 * dim, dim)
+
+    def forward(
+        self, x: torch.Tensor, edge_index: torch.Tensor, edge_weight: torch.Tensor
+    ) -> torch.Tensor:
+        del edge_weight  # GraphSAGE baseline uses topology, not exposure.
+        src, dst = edge_index
+        neighbours = torch.zeros_like(x)
+        neighbours.index_add_(0, dst, x[src])
+        degree = torch.zeros(x.shape[0], dtype=x.dtype, device=x.device)
+        degree.index_add_(0, dst, torch.ones_like(dst, dtype=x.dtype))
+        neighbours = neighbours / degree.clamp_min(1.0).unsqueeze(1)
+        return self.linear(torch.cat([x, neighbours], dim=1))
+
+
+class SGFormerAttention(nn.Module):
+    """Approximation-free linear global attention from SGFormer."""
+
+    def __init__(self, dim: int) -> None:
+        super().__init__()
+        self.q = nn.Linear(dim, dim, bias=False)
+        self.k = nn.Linear(dim, dim, bias=False)
+        self.v = nn.Linear(dim, dim, bias=False)
+
+    def forward(
+        self, x: torch.Tensor, edge_index: torch.Tensor, edge_weight: torch.Tensor
+    ) -> torch.Tensor:
+        del edge_index, edge_weight
+        q = F.normalize(self.q(x), p=2, dim=-1, eps=1e-6)
+        k = F.normalize(self.k(x), p=2, dim=-1, eps=1e-6)
+        v = self.v(x)
+        node_count = x.shape[0]
+        kv = k.transpose(0, 1) @ v
+        numerator = q @ kv + node_count * v
+        denominator = q @ k.sum(dim=0) + node_count
+        return numerator / denominator.clamp_min(1e-6).unsqueeze(1)
+
+
+def k_hop_pairs(
+    edge_index: torch.Tensor, num_nodes: int, max_hops: int
+) -> tuple[torch.Tensor, torch.Tensor]:
+    """Build directed shortest-path pairs up to ``max_hops`` on CPU."""
+
+    neighbours: list[set[int]] = [set() for _ in range(num_nodes)]
+    for src, dst in edge_index.detach().cpu().t().tolist():
+        neighbours[int(src)].add(int(dst))
+    sources: list[int] = []
+    destinations: list[int] = []
+    distances: list[int] = []
+    for destination in range(num_nodes):
+        visited = {destination}
+        frontier = {destination}
+        sources.append(destination)
+        destinations.append(destination)
+        distances.append(0)
+        for distance in range(1, max_hops + 1):
+            next_frontier: set[int] = set()
+            for node in frontier:
+                next_frontier.update(neighbours[node])
+            next_frontier.difference_update(visited)
+            if not next_frontier:
+                break
+            for source in sorted(next_frontier):
+                sources.append(source)
+                destinations.append(destination)
+                distances.append(distance)
+            visited.update(next_frontier)
+            frontier = next_frontier
+    pairs = torch.tensor([sources, destinations], dtype=torch.long)
+    return pairs, torch.tensor(distances, dtype=torch.float32)
+
+
+class GradformerConv(nn.Module):
+    """Sparse node-classification adaptation of Gradformer's decay attention."""
+
+    def __init__(
+        self, dim: int, max_hops: int = 3, lambda_init: float = 1.0, heads: int = 4
+    ) -> None:
+        super().__init__()
+        if dim % heads:
+            raise ValueError("Gradformer hidden dimension must be divisible by heads")
+        self.dim = dim
+        self.heads = heads
+        self.head_dim = dim // heads
+        self.max_hops = max_hops
+        self.q = nn.Linear(dim, dim, bias=False)
+        self.k = nn.Linear(dim, dim, bias=False)
+        self.v = nn.Linear(dim, dim, bias=False)
+        self.out = nn.Linear(dim, dim)
+        inverse_softplus = math.log(math.expm1(max(lambda_init, 1e-4)))
+        self.raw_lambda = nn.Parameter(torch.full((heads,), inverse_softplus))
+        self._pair_cache: dict[tuple[int, int], tuple[torch.Tensor, torch.Tensor]] = {}
+
+    def _pairs(
+        self, edge_index: torch.Tensor, num_nodes: int
+    ) -> tuple[torch.Tensor, torch.Tensor]:
+        key = (int(edge_index.data_ptr()), num_nodes)
+        if key not in self._pair_cache:
+            self._pair_cache[key] = k_hop_pairs(
+                edge_index, num_nodes, self.max_hops
+            )
+        pairs, distance = self._pair_cache[key]
+        return pairs.to(edge_index.device), distance.to(edge_index.device)
+
+    def forward(
+        self, x: torch.Tensor, edge_index: torch.Tensor, edge_weight: torch.Tensor
+    ) -> torch.Tensor:
+        del edge_weight
+        pairs, distance = self._pairs(edge_index, x.shape[0])
+        src, dst = pairs
+        q = self.q(x).view(-1, self.heads, self.head_dim)
+        k = self.k(x).view(-1, self.heads, self.head_dim)
+        v = self.v(x).view(-1, self.heads, self.head_dim)
+        scores = (q[dst] * k[src]).sum(dim=-1) / math.sqrt(self.head_dim)
+        decay = F.softplus(self.raw_lambda).unsqueeze(0) * distance.unsqueeze(1)
+        scores = scores - decay
+
+        max_per_dst = torch.full(
+            (x.shape[0], self.heads),
+            -torch.inf,
+            dtype=scores.dtype,
+            device=scores.device,
+        )
+        index = dst.unsqueeze(1).expand(-1, self.heads)
+        max_per_dst.scatter_reduce_(0, index, scores, reduce="amax", include_self=True)
+        exp_scores = torch.exp(scores - max_per_dst[dst])
+        denominator = torch.zeros_like(max_per_dst)
+        denominator.index_add_(0, dst, exp_scores)
+        alpha = exp_scores / (denominator[dst] + EPS)
+        messages = v[src] * alpha.unsqueeze(-1)
+        aggregated = torch.zeros(
+            (x.shape[0], self.heads, self.head_dim),
+            dtype=x.dtype,
+            device=x.device,
+        )
+        aggregated.index_add_(0, dst, messages)
+        return self.out(aggregated.reshape(x.shape[0], self.dim))
+
+
 class RiskModel(nn.Module):
     def __init__(
         self,
@@ -530,6 +747,8 @@ class RiskModel(nn.Module):
         logvar_max: float = 2.0,
         ec_delta_max: float = 0.05,
         gate_normalized: bool = False,
+        gradformer_max_hops: int = 3,
+        gradformer_lambda_init: float = 1.0,
     ) -> None:
         super().__init__()
         self.model = model
@@ -548,7 +767,7 @@ class RiskModel(nn.Module):
 
         if model == "mlp":
             self.layers = nn.ModuleList()
-        elif model == "gcn":
+        elif model in {"gcn", "gcn_only"}:
             self.layers = nn.ModuleList(
                 [GraphConv(hidden_dim, weighted=False), GraphConv(hidden_dim, weighted=False)]
             )
@@ -558,7 +777,82 @@ class RiskModel(nn.Module):
             )
         elif model == "edge_gat":
             self.layers = nn.ModuleList([EdgeGATConv(hidden_dim), EdgeGATConv(hidden_dim)])
-        elif model == "teg_gnn":
+        elif model == "gat":
+            self.layers = nn.ModuleList([GATConv(hidden_dim), GATConv(hidden_dim)])
+        elif model == "graphsage":
+            self.layers = nn.ModuleList(
+                [GraphSAGEConv(hidden_dim), GraphSAGEConv(hidden_dim)]
+            )
+        elif model in {"graphsage_teg_concat", "graphsage_teg_gate"}:
+            self.sage_layers = nn.ModuleList(
+                [GraphSAGEConv(hidden_dim), GraphSAGEConv(hidden_dim)]
+            )
+            self.teg_layers = nn.ModuleList(
+                [
+                    EdgeGatedConv(hidden_dim, gate_normalized),
+                    EdgeGatedConv(hidden_dim, gate_normalized),
+                ]
+            )
+            if model == "graphsage_teg_concat":
+                self.fusion = nn.Sequential(
+                    nn.Linear(2 * hidden_dim, hidden_dim),
+                    nn.ReLU(),
+                    nn.Dropout(dropout),
+                )
+            else:
+                self.gate = nn.Sequential(
+                    nn.Linear(2 * hidden_dim, hidden_dim),
+                    nn.ReLU(),
+                    nn.Dropout(dropout),
+                    nn.Linear(hidden_dim, 1),
+                    nn.Sigmoid(),
+                )
+            self.layers = nn.ModuleList()
+        elif model == "sgformer_adapted":
+            self.global_attention = SGFormerAttention(hidden_dim)
+            self.local_layers = nn.ModuleList(
+                [GraphConv(hidden_dim, weighted=False)]
+            )
+            self.sg_fusion = nn.Linear(2 * hidden_dim, hidden_dim)
+            self.layers = nn.ModuleList()
+        elif model in {"sgformer_teg_concat", "sgformer_teg_gate"}:
+            self.global_attention = SGFormerAttention(hidden_dim)
+            self.local_layers = nn.ModuleList(
+                [GraphConv(hidden_dim, weighted=False)]
+            )
+            self.sg_fusion = nn.Linear(2 * hidden_dim, hidden_dim)
+            self.teg_layers = nn.ModuleList(
+                [
+                    EdgeGatedConv(hidden_dim, gate_normalized),
+                    EdgeGatedConv(hidden_dim, gate_normalized),
+                ]
+            )
+            if model == "sgformer_teg_concat":
+                self.fusion = nn.Sequential(
+                    nn.Linear(2 * hidden_dim, hidden_dim),
+                    nn.ReLU(),
+                    nn.Dropout(dropout),
+                )
+            else:
+                self.gate = nn.Sequential(
+                    nn.Linear(2 * hidden_dim, hidden_dim),
+                    nn.ReLU(),
+                    nn.Dropout(dropout),
+                    nn.Linear(hidden_dim, 1),
+                    nn.Sigmoid(),
+                )
+            self.layers = nn.ModuleList()
+        elif model == "gradformer_adapted":
+            self.layers = nn.ModuleList(
+                [
+                    GradformerConv(
+                        hidden_dim,
+                        max_hops=gradformer_max_hops,
+                        lambda_init=gradformer_lambda_init,
+                    )
+                ]
+            )
+        elif model in {"teg_gnn", "teg_only"}:
             self.layers = nn.ModuleList(
                 [
                     EdgeGatedConv(hidden_dim, gate_normalized),
@@ -567,6 +861,7 @@ class RiskModel(nn.Module):
             )
         elif model in {
             "gcn_teg_concat",
+            "stable_tail_gnn",
             "gcn_teg_residual_fixed",
             "gcn_teg_residual_learnable",
             "ua_teg_gnn",
@@ -585,6 +880,7 @@ class RiskModel(nn.Module):
             self.layers = nn.ModuleList()
             if model in {
                 "gcn_teg_concat",
+                "stable_tail_gnn",
                 "ua_teg_gnn",
                 "stable_tail_ua_gnn",
                 "stable_tail_ec_gnn",
@@ -634,13 +930,67 @@ class RiskModel(nn.Module):
             h = self.dropout(h + residual)
         return h
 
+    def _run_plain_layers(
+        self,
+        h: torch.Tensor,
+        layers: nn.ModuleList,
+        graph: GraphData,
+    ) -> torch.Tensor:
+        """Run the explicitly non-residual branches used by concat models."""
+        for layer in layers:
+            if isinstance(layer, EdgeGatedConv):
+                h = layer(h, graph.edge_index, graph.edge_weight)
+            else:
+                h = layer(h, graph.edge_index, graph.edge_weight)
+            h = self.dropout(F.relu(h))
+        return h
+
+    def _encode_sgformer(self, h: torch.Tensor, graph: GraphData) -> torch.Tensor:
+        global_h = F.relu(
+            self.global_attention(h, graph.edge_index, graph.edge_weight)
+        )
+        local_h = self._run_layers(h, self.local_layers, graph)
+        return self.dropout(
+            F.relu(self.sg_fusion(torch.cat([global_h, local_h], dim=1))) + h
+        )
+
+    def _gate_fusion(
+        self, left: torch.Tensor, right: torch.Tensor
+    ) -> torch.Tensor:
+        gate = self.gate(torch.cat([left, right], dim=1))
+        return self.dropout(gate * left + (1.0 - gate) * right)
+
     def encode(self, graph: GraphData) -> torch.Tensor:
         h = F.relu(self.encoder(graph.x))
         if self.model == "mlp":
             return self.dropout(h)
 
+        if self.model == "sgformer_adapted":
+            return self._encode_sgformer(h, graph)
+
+        if self.model == "graphsage_teg_concat":
+            h_sage = self._run_plain_layers(h, self.sage_layers, graph)
+            h_teg = self._run_plain_layers(h, self.teg_layers, graph)
+            return self.fusion(torch.cat([h_sage, h_teg], dim=1))
+
+        if self.model == "graphsage_teg_gate":
+            h_sage = self._run_plain_layers(h, self.sage_layers, graph)
+            h_teg = self._run_plain_layers(h, self.teg_layers, graph)
+            return self._gate_fusion(h_sage, h_teg)
+
+        if self.model == "sgformer_teg_concat":
+            h_sgformer = self._encode_sgformer(h, graph)
+            h_teg = self._run_plain_layers(h, self.teg_layers, graph)
+            return self.fusion(torch.cat([h_sgformer, h_teg], dim=1))
+
+        if self.model == "sgformer_teg_gate":
+            h_sgformer = self._encode_sgformer(h, graph)
+            h_teg = self._run_plain_layers(h, self.teg_layers, graph)
+            return self._gate_fusion(h_sgformer, h_teg)
+
         if self.model in {
             "gcn_teg_concat",
+            "stable_tail_gnn",
             "gcn_teg_residual_fixed",
             "gcn_teg_residual_learnable",
             "ua_teg_gnn",
@@ -649,7 +999,12 @@ class RiskModel(nn.Module):
         }:
             h_gcn = self._run_layers(h, self.gcn_layers, graph)
             h_teg = self._run_layers(h, self.teg_layers, graph)
-            if self.model in {"gcn_teg_concat", "ua_teg_gnn", "stable_tail_ec_gnn"}:
+            if self.model in {
+                "gcn_teg_concat",
+                "stable_tail_gnn",
+                "ua_teg_gnn",
+                "stable_tail_ec_gnn",
+            }:
                 h = self.fusion(torch.cat([h_gcn, h_teg], dim=1))
             else:
                 mu = self.mu if self.mu is not None else h.new_tensor(0.1)
@@ -1153,6 +1508,10 @@ def save_checkpoint(
                 "logvar_max": getattr(args, "logvar_max", 2.0),
                 "ec_delta_max": getattr(args, "ec_delta_max", 0.05),
                 "gate_normalized": getattr(args, "gate_normalized", False),
+                "gradformer_max_hops": getattr(args, "gradformer_max_hops", 3),
+                "gradformer_lambda_init": getattr(
+                    args, "gradformer_lambda_init", 1.0
+                ),
             },
             "training_config": {
                 "split": args.split,
@@ -1222,6 +1581,8 @@ def train(args: argparse.Namespace) -> dict[str, object]:
         getattr(args, "logvar_max", 2.0),
         getattr(args, "ec_delta_max", 0.05),
         getattr(args, "gate_normalized", False),
+        getattr(args, "gradformer_max_hops", 3),
+        getattr(args, "gradformer_lambda_init", 1.0),
     )
     weights = class_weights(graphs, split_map)
 
@@ -1384,6 +1745,7 @@ def train(args: argparse.Namespace) -> dict[str, object]:
     )
     return {
         "model": args.model,
+        "paper_model_name": PAPER_MODEL_NAMES.get(args.model, args.model),
         "split": args.split,
         "seed": args.seed,
         "epochs": args.epochs,
