@@ -157,6 +157,19 @@ Dry-run the full 10seed pipeline:
 .\PyVRP-main\.venv\Scripts\python.exe -B .\hazmat_risk_experiments\scripts\run_10seed_pipeline.py --dry-run --stages models,node_tables,risk,od,pyvrp,concentration,customer_sets
 ```
 
+Run the paper-facing comparison added for GCN, GAT, GraphSAGE, TEG-only,
+Stable-Tail GNN, and Stable-Tail without tail loss. These stages use Split B,
+the same seeds and full loss for the main models, and the common
+`exposure_floor=0.01` export rule:
+
+```powershell
+.\PyVRP-main\.venv\Scripts\python.exe -B .\hazmat_risk_experiments\scripts\run_10seed_pipeline.py --stages paper_models,paper_tables,paper_risk,paper_od,paper_pyvrp
+```
+
+The new stages are separate from the historical pipeline so old checkpoints
+and paper tables remain reproducible. `paper_models` must finish before the
+other `paper_*` stages.
+
 Use `node_tables` in the stage list when regenerating paper-ready node-risk
 tables without rerunning model training:
 

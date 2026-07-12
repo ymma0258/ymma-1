@@ -57,20 +57,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--model",
         default="teg_gnn",
-        choices=[
-            "mlp",
-            "gcn",
-            "weighted_gcn",
-            "edge_gat",
-            "teg_gnn",
-            "gcn_teg_concat",
-            "gcn_teg_residual_fixed",
-            "gcn_teg_residual_learnable",
-            "ua_gnn",
-            "ua_teg_gnn",
-            "stable_tail_ua_gnn",
-            "stable_tail_ec_gnn",
-        ],
+        choices=train_risk_model.MODEL_CHOICES,
     )
     parser.add_argument("--split", default="B", choices=["A", "B", "C"])
     parser.add_argument(

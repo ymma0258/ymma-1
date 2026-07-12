@@ -36,6 +36,37 @@ def graph(year: str, labels: list[int]) -> training.GraphData:
 
 
 class TrainingPipelineTests(unittest.TestCase):
+    def test_new_comparison_models_emit_eight_logits(self) -> None:
+        item = graph("data_2020", [1, 2, 3, 4])
+        for model_name in [
+            "gcn_only",
+            "gat",
+            "graphsage",
+            "graphsage_teg_concat",
+            "graphsage_teg_gate",
+            "teg_only",
+            "stable_tail_gnn",
+            "sgformer_adapted",
+            "sgformer_teg_concat",
+            "sgformer_teg_gate",
+            "gradformer_adapted",
+        ]:
+            with self.subTest(model=model_name):
+                model = training.RiskModel(model_name, 3, 8, 0.0)
+                self.assertEqual(tuple(model(item).shape), (4, 8))
+
+    def test_gat_and_graphsage_ignore_exposure_weights(self) -> None:
+        item = graph("data_2020", [1, 2, 3, 4])
+        for model_name in ["gat", "graphsage"]:
+            with self.subTest(model=model_name):
+                model = training.RiskModel(model_name, 3, 8, 0.0).eval()
+                with torch.no_grad():
+                    before = model(item)
+                    item.edge_weight *= 100
+                    after = model(item)
+                    item.edge_weight /= 100
+                self.assertTrue(torch.allclose(before, after))
+
     def test_tail_score_uses_high_risk_probability_and_clips(self) -> None:
         scores = np.asarray([0.10, 0.90])
         p_high = np.asarray([0.40, 0.80])

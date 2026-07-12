@@ -35,7 +35,13 @@ def parse_label_dir(value: str) -> tuple[str, Path]:
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("run_dirs", nargs="+", type=parse_label_dir)
+    parser.add_argument("run_dirs", nargs="*", type=parse_label_dir)
+    parser.add_argument(
+        "--run-list",
+        type=Path,
+        default=None,
+        help="Optional CSV with label and run_dir columns. Appended to positional run dirs.",
+    )
     parser.add_argument("--common-risk-dir", type=Path, required=True)
     parser.add_argument("--output-dir", type=Path, required=True)
     parser.add_argument("--batch-name", default="load_aware_common_evaluation")
@@ -61,6 +67,16 @@ def write_csv(path: Path, rows: list[dict[str, object]]) -> None:
         writer = csv.DictWriter(handle, fieldnames=fields)
         writer.writeheader()
         writer.writerows(rows)
+
+
+def load_run_sources(args: argparse.Namespace) -> list[tuple[str, Path]]:
+    sources: list[tuple[str, Path]] = list(args.run_dirs)
+    if args.run_list is not None:
+        for row in read_csv(args.run_list):
+            sources.append((row["label"], Path(row["run_dir"])))
+    if not sources:
+        raise ValueError("Provide at least one run dir or --run-list CSV.")
+    return sources
 
 
 def load_weighted_route_risks(graph, inst, sequence: list[int]) -> np.ndarray:
@@ -190,20 +206,33 @@ def main() -> None:
     graph = pyvrp_eval.largest_component(graph)
     rows: list[dict[str, object]] = []
     failures: list[dict[str, object]] = []
-    for label, run_dir in args.run_dirs:
+    run_sources = load_run_sources(args)
+    instance_cache = {}
+    for label, run_dir in run_sources:
         try:
             meta = json.loads((run_dir / "pyvrp_cvrp_meta.json").read_text(encoding="utf-8"))
-            inst = pyvrp_eval.build_instance(
-                graph,
-                scores_norm,
+            customers = tuple(int(node) for node in meta["customers"])
+            cache_key = (
                 int(meta["num_customers"]),
                 int(meta["num_vehicles"]),
                 int(meta["capacity"]),
                 str(meta["customer_set"]),
-                0,
                 int(meta["depot"]),
-                [int(node) for node in meta["customers"]],
+                customers,
             )
+            if cache_key not in instance_cache:
+                instance_cache[cache_key] = pyvrp_eval.build_instance(
+                    graph,
+                    scores_norm,
+                    int(meta["num_customers"]),
+                    int(meta["num_vehicles"]),
+                    int(meta["capacity"]),
+                    str(meta["customer_set"]),
+                    0,
+                    int(meta["depot"]),
+                    list(customers),
+                )
+            inst = instance_cache[cache_key]
             for row in read_csv(run_dir / "pyvrp_cvrp_detail.csv"):
                 beta = float(row["beta"])
                 lam = float(row.get("lambda_concentration", 0.0))
@@ -239,7 +268,7 @@ def main() -> None:
                 "betas": sorted(allowed_betas),
                 "lambda_concentration": args.lambda_concentration,
                 "definition": "regional edge risk multiplied by pre-service remaining load / vehicle capacity",
-                "run_dirs": {label: str(path) for label, path in args.run_dirs},
+                "run_dirs": {label: str(path) for label, path in run_sources},
             },
             ensure_ascii=False,
             indent=2,

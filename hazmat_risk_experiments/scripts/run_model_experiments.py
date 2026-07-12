@@ -47,6 +47,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--epochs", type=int, default=1)
     parser.add_argument("--hidden-dim", type=int, default=64)
     parser.add_argument("--dropout", type=float, default=0.2)
+    parser.add_argument("--gradformer-max-hops", type=int, default=3)
+    parser.add_argument("--gradformer-lambda-init", type=float, default=1.0)
     parser.add_argument("--lr", type=float, default=1e-3)
     parser.add_argument("--weight-decay", type=float, default=1e-4)
     parser.add_argument("--topk-frac", type=float, default=0.2)
@@ -98,6 +100,8 @@ def train_args(base: argparse.Namespace, model: str, split: str, seed: int) -> a
         epochs=base.epochs,
         hidden_dim=base.hidden_dim,
         dropout=base.dropout,
+        gradformer_max_hops=base.gradformer_max_hops,
+        gradformer_lambda_init=base.gradformer_lambda_init,
         lr=base.lr,
         weight_decay=base.weight_decay,
         seed=seed,
@@ -139,6 +143,7 @@ def metric_rows(result: dict[str, object]) -> list[dict[str, object]]:
         assert isinstance(values, dict)
         row: dict[str, object] = {
             "model": result["model"],
+            "paper_model_name": result.get("paper_model_name", result["model"]),
             "split": result["split"],
             "seed": result["seed"],
             "epochs": result["epochs"],
@@ -206,6 +211,7 @@ def summarize(rows: list[dict[str, object]]) -> list[dict[str, object]]:
         out: dict[str, object] = {
             "experiment_tag": tag,
             "model": model,
+            "paper_model_name": group_rows[0].get("paper_model_name", model),
             "split": split,
             "eval_split": eval_split,
             "runs": len(group_rows),
