@@ -1422,7 +1422,7 @@ def stage_paper_pyvrp(args: argparse.Namespace) -> None:
                 script("common_evaluate_pyvrp_routes.py"),
                 *source_args(run_dirs_for_chunked_batch(args, batch, sources)),
                 "--common-risk-dir",
-                str(risk_dir(args.outputs_root, common_ensemble_dir())),
+                str(risk_dir(args.outputs_root, paper_common_reference_dir())),
                 "--output-dir",
                 str(pyvrp_root(args.outputs_root)),
                 "--batch-name",
@@ -1625,6 +1625,7 @@ def stage_fusion_load_eval(args: argparse.Namespace) -> None:
 
 
 def stage_gate_load_eval(args: argparse.Namespace) -> None:
+    """Evaluate base + strong + fusion + gate routes under one paper reference."""
     base_sources = risk_sources(
         args,
         [
@@ -1667,7 +1668,7 @@ def stage_gate_load_eval(args: argparse.Namespace) -> None:
         "--run-list",
         str(run_list),
         "--common-risk-dir",
-        str(risk_dir(args.outputs_root, common_ensemble_dir())),
+        str(risk_dir(args.outputs_root, paper_common_reference_dir())),
         "--output-dir",
         str(pyvrp_root(args.outputs_root)),
         "--betas",
