@@ -1,0 +1,19 @@
+## Table 2. Split A node-risk evaluation results
+
+| Model | Macro-F1 | MAE | QWK | Recall@6-8 | PR-AUC | High FN |
+|---|---:|---:|---:|---:|---:|---:|
+
+## Table 3. Split B node-risk evaluation results
+
+| Model | Macro-F1 | MAE | QWK | Recall@6-8 | PR-AUC | High FN |
+|---|---:|---:|---:|---:|---:|---:|
+| GCN | 0.2881 | 1.3739 | 0.2562 | 0.2154 | 0.3495 | 0.7846 |
+| GAT | 0.2546 | 1.3744 | 0.2032 | 0.1769 | 0.3059 | 0.8231 |
+| GraphSAGE | 0.2960 | 1.2773 | 0.2992 | 0.2808 | 0.3763 | 0.7192 |
+| TEG-only | 0.2878 | 1.6617 | 0.2993 | 0.3000 | 0.3455 | 0.7000 |
+| Stable-Tail GNN | 0.2896 | 1.2666 | 0.2904 | 0.2462 | 0.3659 | 0.7538 |
+
+Notes:
+
+- `High FN` is the high-risk false-negative rate for labels 6-8.
+- Values are computed from `paper comparison Split B, 10 seeds, common full loss`, `eval_split=data_2021_test`, and rounded to four decimals.
