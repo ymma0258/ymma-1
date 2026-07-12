@@ -20,7 +20,12 @@ Main settings:
 - Edge-risk mode: `floor_0.01`, with `w_floor = 0.01 + 0.99w`.
 - Main risk matrix: `R_ij = w_floor * max(S_i_norm, S_j_norm)`.
 - Final model name in the paper: `Stable-Tail GNN`, implemented as
-  `gcn_teg_concat`.
+  `stable_tail_gnn`.
+- Common-reference route evaluation uses
+  `paper_common_reference_10seed_floor_0p01`: an equal-weight aggregate of
+  every seed of the five paper main models (GCN, GAT, GraphSAGE, TEG-only,
+  and Stable-Tail GNN). Both the paper and Gate load evaluations use this
+  same reference matrix.
 
 Formal 10seed outputs are stored separately from legacy 5seed/exploration files:
 
@@ -154,7 +159,7 @@ print("syntax ok")
 Dry-run the full 10seed pipeline:
 
 ```powershell
-.\PyVRP-main\.venv\Scripts\python.exe -B .\hazmat_risk_experiments\scripts\run_10seed_pipeline.py --dry-run --stages models,node_tables,risk,od,pyvrp,concentration,customer_sets
+.\PyVRP-main\.venv\Scripts\python.exe -B .\hazmat_risk_experiments\scripts\run_10seed_pipeline.py --dry-run --stages paper_models,strong_models,fusion_models,gate_models,paper_risk,strong_risk,fusion_risk,gate_risk,paper_tables,paper_od,strong_od,fusion_od,gate_od,paper_pyvrp,strong_pyvrp,fusion_pyvrp,gate_pyvrp,gate_load_eval,customer_sets,consistency_checks
 ```
 
 Use `node_tables` in the stage list when regenerating paper-ready node-risk

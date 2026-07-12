@@ -1,0 +1,55 @@
+{
+  "node_rows": 11,
+  "ablation_rows": 4,
+  "od_rows": 24,
+  "self_rows": 1200,
+  "common_rows": 1200,
+  "load_rows": 1200,
+  "joined_rows": 1200,
+  "fixed_budget_detail_rows": 1680,
+  "fixed_budget_summary_rows": 168,
+  "significance_rows": 154,
+  "targeted_significance_rows": 84,
+  "cost_risk_auc_detail_rows": 240,
+  "cost_risk_auc_summary_rows": 24,
+  "auc_significance_rows": 22,
+  "gate_pairwise_significance_rows": 48,
+  "all_models_summary_rows": 12,
+  "models": [
+    "GCN",
+    "GAT",
+    "GraphSAGE",
+    "GraphSAGE-TEG-Concat",
+    "GraphSAGE-TEG-Gate",
+    "SGFormer-adapted",
+    "SGFormer-TEG-Concat",
+    "SGFormer-TEG-Gate",
+    "Gradformer-adapted",
+    "TEG-only",
+    "Stable-Tail w/o Tail Loss",
+    "Stable-Tail GNN"
+  ],
+  "model_seeds": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9
+  ],
+  "customer_sets": [
+    "A",
+    "B"
+  ],
+  "betas": [
+    0.0,
+    0.25,
+    0.5,
+    1.0,
+    2.0
+  ]
+}

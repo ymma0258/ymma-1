@@ -50,10 +50,16 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--max-runtime", type=float, default=10.0)
     parser.add_argument(
         "--stages",
-        default="models,node_tables,risk,od,pyvrp,concentration,customer_sets",
+        default=(
+            "paper_models,strong_models,fusion_models,gate_models,"
+            "paper_risk,strong_risk,fusion_risk,gate_risk,paper_tables,"
+            "paper_od,strong_od,fusion_od,gate_od,paper_pyvrp,strong_pyvrp,"
+            "fusion_pyvrp,gate_pyvrp,gate_load_eval,customer_sets,"
+            "consistency_checks"
+        ),
         help=(
-            "Comma-separated stages: models,node_tables,risk,od,pyvrp,"
-            "concentration,customer_sets,consistency_checks."
+            "Comma-separated paper stages, or legacy models,node_tables,risk,od,"
+            "pyvrp,concentration,customer_sets,consistency_checks."
         ),
     )
     parser.add_argument("--dry-run", action="store_true")
@@ -327,6 +333,26 @@ def label_ref_dir(seed: int) -> str:
 
 def common_ensemble_dir() -> str:
     return "common_ensemble4_10seed_floor_0p01"
+
+
+def paper_common_reference_dir() -> str:
+    """Uniform evaluator reference aggregated over all paper main-model seeds."""
+    return "paper_common_reference_10seed_floor_0p01"
+
+
+def paper_risk_dir(model: str, tag: str, seed: int) -> str:
+    return f"{model}_splitB_seed{seed}_epochs50_{tag}_floor_0p01"
+
+
+PAPER_MAIN_MODELS = ["gcn", "gat", "graphsage", "teg_only", "stable_tail_gnn"]
+STRONG_MODELS = ["sgformer_adapted", "gradformer_adapted"]
+FUSION_MODELS = ["graphsage_teg_concat", "sgformer_teg_concat"]
+GATE_MODELS = ["graphsage_teg_gate", "sgformer_teg_gate"]
+PAPER_TAG = "paper_comparison_10seed"
+STRONG_TAG = "paper_strong_baselines_10seed"
+FUSION_TAG = "paper_teg_concat_fusions_10seed"
+GATE_TAG = "paper_teg_gate_fusions_10seed"
+NO_TAIL_TAG = "paper_no_tail_loss_10seed"
 
 
 MODEL_RISK_DIRS = {
@@ -966,6 +992,165 @@ def stage_concentration(args: argparse.Namespace) -> None:
             args.dry_run,
         )
 
+
+def stage_paper_models(args: argparse.Namespace) -> None:
+    """Train the paper main comparison and its no-tail-loss ablation."""
+    base = [
+        PYTHON, "-B", script("run_model_experiments.py"),
+        "--output-dir", str(model_dir(args.outputs_root)), "--splits", "B",
+        "--seeds", args.seeds, "--epochs", str(args.epochs),
+    ]
+    run(base + ["--models", ",".join(PAPER_MAIN_MODELS), "--batch-name",
+                "paper_main_comparison_splitB_10seed", "--experiment-tag", PAPER_TAG], args.dry_run)
+    run(base + ["--models", "stable_tail_gnn", "--batch-name",
+                "paper_stable_tail_no_tail_loss_splitB_10seed", "--experiment-tag", NO_TAIL_TAG,
+                "--alpha-hr", "0", "--alpha-topk", "0"], args.dry_run)
+
+
+def stage_strong_models(args: argparse.Namespace) -> None:
+    run([
+        PYTHON, "-B", script("run_model_experiments.py"), "--output-dir", str(model_dir(args.outputs_root)),
+        "--models", ",".join(STRONG_MODELS), "--splits", "B", "--seeds", args.seeds,
+        "--epochs", str(args.epochs), "--batch-name", "paper_strong_baselines_splitB_10seed",
+        "--experiment-tag", STRONG_TAG,
+    ], args.dry_run)
+
+
+def stage_fusion_models(args: argparse.Namespace) -> None:
+    run([
+        PYTHON, "-B", script("run_model_experiments.py"), "--output-dir", str(model_dir(args.outputs_root)),
+        "--models", ",".join(FUSION_MODELS), "--splits", "B", "--seeds", args.seeds,
+        "--epochs", str(args.epochs), "--batch-name", "paper_teg_concat_fusions_splitB_10seed",
+        "--experiment-tag", FUSION_TAG,
+    ], args.dry_run)
+
+
+def stage_gate_models(args: argparse.Namespace) -> None:
+    run([
+        PYTHON, "-B", script("run_model_experiments.py"), "--output-dir", str(model_dir(args.outputs_root)),
+        "--models", ",".join(GATE_MODELS), "--splits", "B", "--seeds", args.seeds,
+        "--epochs", str(args.epochs), "--batch-name", "paper_teg_gate_fusions_splitB_10seed",
+        "--experiment-tag", GATE_TAG,
+    ], args.dry_run)
+
+
+def stage_paper_tables(args: argparse.Namespace) -> None:
+    summaries = model_dir(args.outputs_root)
+    run([
+        PYTHON, "-B", script("summarize_node_risk_eval_tables.py"),
+        "--formal-source", str(summaries / "paper_main_comparison_splitB_10seed_summary.csv"),
+        "--stable-source", str(summaries / "paper_stable_tail_no_tail_loss_splitB_10seed_summary.csv"),
+        "--strong-source", str(summaries / "paper_strong_baselines_splitB_10seed_summary.csv"),
+        "--fusion-source", str(summaries / "paper_teg_concat_fusions_splitB_10seed_summary.csv"),
+        "--gate-source", str(summaries / "paper_teg_gate_fusions_splitB_10seed_summary.csv"),
+        "--source-out-dir", str(summaries / "paper_comparison_tables_10seed"),
+        "--paper-out-dir", str(args.final_root / "paper_results" / "02_model_results"),
+        "--suffix", "_paper_10seed",
+        "--note-label", "paper main, strong-baseline, concat-fusion, gate-fusion, and no-tail-loss 10seed summaries",
+    ], args.dry_run)
+
+
+def stage_paper_risk_group(args: argparse.Namespace, models: list[str], tag: str) -> None:
+    export_base(args, ",".join(models), tag)
+
+
+def stage_paper_risk(args: argparse.Namespace) -> None:
+    stage_paper_risk_group(args, PAPER_MAIN_MODELS, PAPER_TAG)
+    export_base(args, "stable_tail_gnn", NO_TAIL_TAG, checkpoint_tag=NO_TAIL_TAG)
+    sources = [
+        str(risk_dir(args.outputs_root, paper_risk_dir(model, PAPER_TAG, seed)))
+        for model in PAPER_MAIN_MODELS for seed in parse_seed_csv(args.seeds)
+    ]
+    run([
+        PYTHON, "-B", script("export_ensemble_risk_matrix.py"), *sources,
+        "--output-dir", str(risk_root(args.outputs_root)), "--name", paper_common_reference_dir(),
+    ], args.dry_run)
+
+
+def stage_strong_risk(args: argparse.Namespace) -> None:
+    stage_paper_risk_group(args, STRONG_MODELS, STRONG_TAG)
+
+
+def stage_fusion_risk(args: argparse.Namespace) -> None:
+    stage_paper_risk_group(args, FUSION_MODELS, FUSION_TAG)
+
+
+def stage_gate_risk(args: argparse.Namespace) -> None:
+    stage_paper_risk_group(args, GATE_MODELS, GATE_TAG)
+
+
+def paper_sources(args: argparse.Namespace, models: list[str], tag: str) -> list[tuple[str, Path]]:
+    return [
+        (f"{model}_seed{seed}", risk_dir(args.outputs_root, paper_risk_dir(model, tag, seed)))
+        for model in models for seed in parse_seed_csv(args.seeds)
+    ]
+
+
+def stage_paper_od_group(args: argparse.Namespace, name: str, sources: list[tuple[str, Path]]) -> None:
+    run([
+        PYTHON, "-B", script("compare_model_od_paths.py"), *source_args(sources),
+        "--pairs", str(ensure_fixed_od_pairs(args)), "--output-dir", str(od_root(args.outputs_root)),
+        "--batch-name", name, "--k-paths", "50", "--cvar-alpha", "0.9", "--re-threshold", "p75",
+    ], args.dry_run)
+
+
+def stage_paper_od(args: argparse.Namespace) -> None:
+    stage_paper_od_group(args, "paper_od_comparison_10seed", paper_sources(args, PAPER_MAIN_MODELS, PAPER_TAG))
+
+
+def stage_strong_od(args: argparse.Namespace) -> None:
+    stage_paper_od_group(args, "strong_od_comparison_10seed", paper_sources(args, STRONG_MODELS, STRONG_TAG))
+
+
+def stage_fusion_od(args: argparse.Namespace) -> None:
+    stage_paper_od_group(args, "fusion_od_comparison_10seed", paper_sources(args, FUSION_MODELS, FUSION_TAG))
+
+
+def stage_gate_od(args: argparse.Namespace) -> None:
+    stage_paper_od_group(args, "gate_od_comparison_10seed", paper_sources(args, GATE_MODELS, GATE_TAG))
+
+
+def stage_paper_pyvrp_group(args: argparse.Namespace, name: str, sources: list[tuple[str, Path]]) -> list[str]:
+    chunks = run_pyvrp_chunked(args, sources, name, "0,1.0", "0")
+    if not args.dry_run:
+        aggregate_pyvrp_summary(merge_pyvrp_chunks(args, name, chunks), f"{name}.csv")
+    return chunks
+
+
+def stage_common_load_eval(args: argparse.Namespace, name: str, sources: list[tuple[str, Path]], chunks: list[str]) -> None:
+    run([
+        PYTHON, "-B", script("common_evaluate_pyvrp_routes.py"),
+        *source_args(run_dirs_for_chunked_batch(args, name, sources)),
+        "--common-risk-dir", str(risk_dir(args.outputs_root, paper_common_reference_dir())),
+        "--output-dir", str(pyvrp_root(args.outputs_root)), "--batch-name", f"{name}_load_eval",
+        "--beta", "1.0", "--lambda-concentration", "0",
+    ], args.dry_run)
+
+
+def stage_paper_pyvrp(args: argparse.Namespace) -> None:
+    name = "paper_pyvrp50_beta1_10seed"
+    sources = paper_sources(args, PAPER_MAIN_MODELS, PAPER_TAG)
+    chunks = stage_paper_pyvrp_group(args, name, sources)
+    stage_common_load_eval(args, name, sources, chunks)
+
+
+def stage_strong_pyvrp(args: argparse.Namespace) -> None:
+    stage_paper_pyvrp_group(args, "strong_pyvrp50_beta1_10seed", paper_sources(args, STRONG_MODELS, STRONG_TAG))
+
+
+def stage_fusion_pyvrp(args: argparse.Namespace) -> None:
+    stage_paper_pyvrp_group(args, "fusion_pyvrp50_beta1_10seed", paper_sources(args, FUSION_MODELS, FUSION_TAG))
+
+
+def stage_gate_pyvrp(args: argparse.Namespace) -> None:
+    stage_paper_pyvrp_group(args, "gate_pyvrp50_beta1_10seed", paper_sources(args, GATE_MODELS, GATE_TAG))
+
+
+def stage_gate_load_eval(args: argparse.Namespace) -> None:
+    name = "gate_pyvrp50_beta1_10seed"
+    sources = paper_sources(args, GATE_MODELS, GATE_TAG)
+    stage_common_load_eval(args, name, sources, [])
+
 def stage_customer_sets(args: argparse.Namespace) -> None:
     meta_paths = ensure_fixed_instance_meta(args)
     run(
@@ -980,7 +1165,7 @@ def stage_customer_sets(args: argparse.Namespace) -> None:
             "--paper-section",
             "10_customer_sets_10seed",
             "--risk-dir-pattern",
-            "gcn_teg_concat_splitB_seed{seed}_epochs50_10seed_floor_0p01",
+            "stable_tail_gnn_splitB_seed{seed}_epochs50_paper_comparison_10seed_floor_0p01",
             "--meta-a",
             str(meta_paths["A"]),
             "--meta-b",
@@ -1021,6 +1206,11 @@ def write_manifest(args: argparse.Namespace) -> None:
         "outputs_root": str(args.outputs_root),
         "final_root": str(args.final_root),
         "risk_mode": "floor_0.01",
+        "common_reference_risk_matrix": paper_common_reference_dir(),
+        "common_reference_description": (
+            "Equal-weight ensemble of all 10 seeds of the five paper main models "
+            "(GCN, GAT, GraphSAGE, TEG-only, and Stable-Tail GNN)."
+        ),
         "epochs": args.epochs,
         "max_runtime": args.max_runtime,
     }
@@ -1048,6 +1238,42 @@ def main() -> None:
         stage_pyvrp(args)
     if "concentration" in stages:
         stage_concentration(args)
+    if "paper_models" in stages:
+        stage_paper_models(args)
+    if "strong_models" in stages:
+        stage_strong_models(args)
+    if "fusion_models" in stages:
+        stage_fusion_models(args)
+    if "gate_models" in stages:
+        stage_gate_models(args)
+    if "paper_risk" in stages:
+        stage_paper_risk(args)
+    if "strong_risk" in stages:
+        stage_strong_risk(args)
+    if "fusion_risk" in stages:
+        stage_fusion_risk(args)
+    if "gate_risk" in stages:
+        stage_gate_risk(args)
+    if "paper_tables" in stages:
+        stage_paper_tables(args)
+    if "paper_od" in stages:
+        stage_paper_od(args)
+    if "strong_od" in stages:
+        stage_strong_od(args)
+    if "fusion_od" in stages:
+        stage_fusion_od(args)
+    if "gate_od" in stages:
+        stage_gate_od(args)
+    if "paper_pyvrp" in stages:
+        stage_paper_pyvrp(args)
+    if "strong_pyvrp" in stages:
+        stage_strong_pyvrp(args)
+    if "fusion_pyvrp" in stages:
+        stage_fusion_pyvrp(args)
+    if "gate_pyvrp" in stages:
+        stage_gate_pyvrp(args)
+    if "gate_load_eval" in stages:
+        stage_gate_load_eval(args)
     if "customer_sets" in stages:
         stage_customer_sets(args)
     if "consistency_checks" in stages:

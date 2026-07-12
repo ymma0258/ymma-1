@@ -9,7 +9,10 @@ diagnostic flag.
 The loaded model predicts node risk probabilities for both yearly graphs and
 converts them into continuous edge risks:
 
-    R_ij = w_ij * max(S_i_norm, S_j_norm)
+    w_floor = delta + (1 - delta) * w_ij
+    R_ij = w_floor * max(S_i_norm, S_j_norm)
+
+The formal paper experiments use ``delta = 0.01``.
 
 It also creates a 5x8 trajectory-exposure/severity matrix for explanation.
 """

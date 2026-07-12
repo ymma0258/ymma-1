@@ -1,0 +1,245 @@
+{
+  "model": "graphsage_teg_concat",
+  "split": "B",
+  "seed": 5,
+  "epochs": 50,
+  "risk_mode": "exposure_floor",
+  "exposure_delta": 0.01,
+  "uncertainty_tau": 0.0,
+  "experiment_tag": "paper_teg_concat_fusions_10seed",
+  "checkpoint_path": "D:\\PyVRP-main\\hazmat_risk_experiments\\outputs_10seed\\models\\checkpoints\\graphsage_teg_concat_splitB_seed5_epochs50_paper_teg_concat_fusions_10seed.pt",
+  "best_epoch": 50,
+  "model_source": "checkpoint",
+  "alpha_ord": 0.5,
+  "alpha_hr": 1.0,
+  "alpha_topk": 0.3,
+  "lambda_nll": 0.0,
+  "lambda_var": 0.0,
+  "ec_delta_max": 0.05,
+  "lambda_edge": 0.0,
+  "lambda_edge_high": 0.0,
+  "lambda_distill": 0.0,
+  "lambda_delta": 0.0,
+  "ec_teacher_epochs": 50,
+  "gamma_unc": 0.5,
+  "logvar_min": -5.0,
+  "logvar_max": 2.0,
+  "metrics": {
+    "data_2020_train": {
+      "macro_f1": 0.3078420574279827,
+      "weighted_f1": 0.6660328601010248,
+      "mae": 0.7558097400890847,
+      "qwk": 0.6632099642868956,
+      "recall_6_8": 0.775,
+      "precision_6_8": 0.6078431372549019,
+      "pr_auc_high": 0.8036683257068579,
+      "high_fn_rate": 0.225,
+      "brier": 0.38280802965164185,
+      "ece": 0.08218820122801887,
+      "high_risk_recall_at_top10pct": 0.7,
+      "high_risk_recall_at_top20pct": 1.0,
+      "ndcg_at_top20pct": 0.8247986014360624,
+      "high_risk_hits_at_10": 10.0,
+      "high_risk_hits_at_20": 17.0
+    },
+    "data_2021_train": {
+      "macro_f1": 0.354527417027417,
+      "weighted_f1": 0.6896112094975732,
+      "mae": 0.6020831358558086,
+      "qwk": 0.8102539530426449,
+      "recall_6_8": 0.95,
+      "precision_6_8": 0.6785714285714286,
+      "pr_auc_high": 0.8152475700046962,
+      "high_fn_rate": 0.05,
+      "brier": 0.3328218162059784,
+      "ece": 0.09064840974116868,
+      "high_risk_recall_at_top10pct": 0.65,
+      "high_risk_recall_at_top20pct": 1.0,
+      "ndcg_at_top20pct": 0.81069641188645,
+      "high_risk_hits_at_10": 8.0,
+      "high_risk_hits_at_20": 15.0
+    },
+    "data_2021_val": {
+      "macro_f1": 0.19184981684981683,
+      "weighted_f1": 0.5277167277167276,
+      "mae": 1.3882818188288346,
+      "qwk": 0.2086276867578536,
+      "recall_6_8": 0.4,
+      "precision_6_8": 0.2,
+      "pr_auc_high": 0.44351432880844643,
+      "high_fn_rate": 0.6,
+      "brier": 0.5972010493278503,
+      "ece": 0.16723410884539286,
+      "high_risk_recall_at_top10pct": 0.4,
+      "high_risk_recall_at_top20pct": 0.4,
+      "ndcg_at_top20pct": 0.4748139272498457,
+      "high_risk_hits_at_10": 2.0,
+      "high_risk_hits_at_20": 3.0
+    },
+    "data_2021_test": {
+      "macro_f1": 0.2946239891604493,
+      "weighted_f1": 0.6289466211716943,
+      "mae": 1.1200138566071416,
+      "qwk": 0.48438196204962747,
+      "recall_6_8": 0.5769230769230769,
+      "precision_6_8": 0.5357142857142857,
+      "pr_auc_high": 0.4891635326631555,
+      "high_fn_rate": 0.4230769230769231,
+      "brier": 0.4910029172897339,
+      "ece": 0.0902069491577578,
+      "high_risk_recall_at_top10pct": 0.46153846153846156,
+      "high_risk_recall_at_top20pct": 0.7307692307692307,
+      "ndcg_at_top20pct": 0.6096629678124807,
+      "high_risk_hits_at_10": 7.0,
+      "high_risk_hits_at_20": 10.0
+    }
+  },
+  "split_sizes": {
+    "data_2020": {
+      "train": 419,
+      "val": 0,
+      "test": 0
+    },
+    "data_2021": {
+      "train": 176,
+      "val": 45,
+      "test": 222
+    }
+  },
+  "risk_summaries": {
+    "data_2020": {
+      "edge_count": 6603,
+      "risk_min": 0.0,
+      "risk_max": 0.9056298136711121,
+      "risk_mean": 0.019410084933042526,
+      "risk_p25": 0.0005652090185321867,
+      "risk_p50": 0.0014154321979731321,
+      "risk_p75": 0.004133505746722221,
+      "risk_p90": 0.008845249190926552,
+      "risk_p95": 0.08371370285749435,
+      "risk_p99": 0.44706156849861145,
+      "zero_risk_edge_count": 1,
+      "zero_risk_edge_ratio": 0.00015144631228229593,
+      "edge_attribute_zero_ratio": 0.928365894290474,
+      "matrix_5x8": [
+        [
+          0,
+          724,
+          253,
+          133,
+          84,
+          36,
+          54,
+          37
+        ],
+        [
+          0,
+          697,
+          240,
+          104,
+          61,
+          59,
+          53,
+          107
+        ],
+        [
+          0,
+          677,
+          213,
+          121,
+          122,
+          103,
+          29,
+          55
+        ],
+        [
+          0,
+          727,
+          206,
+          133,
+          73,
+          73,
+          62,
+          47
+        ],
+        [
+          1,
+          634,
+          280,
+          142,
+          71,
+          51,
+          75,
+          66
+        ]
+      ]
+    },
+    "data_2021": {
+      "edge_count": 7647,
+      "risk_min": 6.811959329944273e-10,
+      "risk_max": 0.9044268727302551,
+      "risk_mean": 0.017006782814860344,
+      "risk_p25": 0.0005583895836025476,
+      "risk_p50": 0.0014200202422216535,
+      "risk_p75": 0.004190471488982439,
+      "risk_p90": 0.008202296681702137,
+      "risk_p95": 0.06465776264667511,
+      "risk_p99": 0.4422193467617035,
+      "zero_risk_edge_count": 0,
+      "zero_risk_edge_ratio": 0.0,
+      "edge_attribute_zero_ratio": 0.9314763959722767,
+      "matrix_5x8": [
+        [
+          0,
+          832,
+          387,
+          132,
+          58,
+          68,
+          18,
+          35
+        ],
+        [
+          0,
+          829,
+          274,
+          69,
+          72,
+          179,
+          33,
+          73
+        ],
+        [
+          0,
+          831,
+          279,
+          110,
+          57,
+          172,
+          23,
+          58
+        ],
+        [
+          0,
+          834,
+          211,
+          112,
+          77,
+          215,
+          48,
+          32
+        ],
+        [
+          0,
+          700,
+          409,
+          107,
+          46,
+          154,
+          61,
+          52
+        ]
+      ]
+    }
+  }
+}

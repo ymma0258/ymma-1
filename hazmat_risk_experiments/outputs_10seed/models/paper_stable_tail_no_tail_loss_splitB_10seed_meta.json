@@ -1,0 +1,44 @@
+{
+  "models": [
+    "stable_tail_gnn"
+  ],
+  "splits": [
+    "B"
+  ],
+  "seeds": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9
+  ],
+  "epochs": 50,
+  "experiment_tag": "paper_no_tail_loss_10seed",
+  "alpha_ord": 0.5,
+  "alpha_hr": 0.0,
+  "alpha_topk": 0.0,
+  "lambda_nll": 0.0,
+  "lambda_var": 0.0,
+  "ec_delta_max": 0.05,
+  "lambda_edge": 0.0,
+  "lambda_edge_high": 0.0,
+  "lambda_distill": 0.0,
+  "lambda_delta": 0.0,
+  "ec_teacher_epochs": 50,
+  "gamma_unc": 0.5,
+  "topk_frac": 0.2,
+  "stage1_epochs": 0,
+  "split_b_val_fraction": 0.2,
+  "checkpoint_selection": "best",
+  "gate_normalized": false,
+  "feature_standardization": false,
+  "edge_normalization": "per_year",
+  "elapsed_seconds": 386.2730042934418,
+  "num_metric_rows": 40,
+  "num_failures": 0
+}

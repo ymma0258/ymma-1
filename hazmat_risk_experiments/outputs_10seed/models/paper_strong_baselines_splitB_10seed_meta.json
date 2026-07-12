@@ -1,0 +1,45 @@
+{
+  "models": [
+    "sgformer_adapted",
+    "gradformer_adapted"
+  ],
+  "splits": [
+    "B"
+  ],
+  "seeds": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9
+  ],
+  "epochs": 50,
+  "experiment_tag": "paper_strong_baselines_10seed",
+  "alpha_ord": 0.5,
+  "alpha_hr": 1.0,
+  "alpha_topk": 0.3,
+  "lambda_nll": 0.0,
+  "lambda_var": 0.0,
+  "ec_delta_max": 0.05,
+  "lambda_edge": 0.0,
+  "lambda_edge_high": 0.0,
+  "lambda_distill": 0.0,
+  "lambda_delta": 0.0,
+  "ec_teacher_epochs": 50,
+  "gamma_unc": 0.5,
+  "topk_frac": 0.2,
+  "stage1_epochs": 0,
+  "split_b_val_fraction": 0.2,
+  "checkpoint_selection": "best",
+  "gate_normalized": false,
+  "feature_standardization": false,
+  "edge_normalization": "per_year",
+  "elapsed_seconds": 1416.4419648647308,
+  "num_metric_rows": 80,
+  "num_failures": 0
+}

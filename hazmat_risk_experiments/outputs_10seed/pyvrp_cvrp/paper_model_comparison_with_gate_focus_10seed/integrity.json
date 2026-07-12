@@ -1,0 +1,8 @@
+{
+  "summary_rows": 4,
+  "aubrc_significance_rows": 9,
+  "risk20_significance_rows": 12,
+  "complexity_rows": 2,
+  "target": "SGFormer-TEG-Gate",
+  "reference": "Stable-Tail GNN"
+}

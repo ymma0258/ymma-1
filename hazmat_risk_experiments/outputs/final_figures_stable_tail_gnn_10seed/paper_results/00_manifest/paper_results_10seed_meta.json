@@ -27,5 +27,7 @@
   "outputs_root": "D:\\PyVRP-main\\hazmat_risk_experiments\\outputs_10seed",
   "final_root": "D:\\PyVRP-main\\hazmat_risk_experiments\\outputs\\final_figures_stable_tail_gnn_10seed",
   "risk_mode": "floor_0.01",
+  "common_reference_risk_matrix": "paper_common_reference_10seed_floor_0p01",
+  "common_reference_description": "Equal-weight ensemble of all 10 seeds of the five paper main models (GCN, GAT, GraphSAGE, TEG-only, and Stable-Tail GNN).",
   "note": "10seed package generated without modifying 5seed outputs."
 }
