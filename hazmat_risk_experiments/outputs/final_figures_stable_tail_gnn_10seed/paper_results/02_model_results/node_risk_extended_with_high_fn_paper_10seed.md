@@ -1,0 +1,18 @@
+## Table 2. Split A extended fusion comparison results
+
+| Model | Macro-F1 | MAE | QWK | Recall@6-8 | PR-AUC | High FN |
+|---|---:|---:|---:|---:|---:|---:|
+
+## Table 3. Split B extended fusion comparison results
+
+| Model | Macro-F1 | MAE | QWK | Recall@6-8 | PR-AUC | High FN |
+|---|---:|---:|---:|---:|---:|---:|
+| GraphSAGE-TEG-Concat | 0.2335 | 1.2633 | 0.3205 | 0.3538 | 0.3503 | 0.6462 |
+| SGFormer-TEG-Concat | 0.2668 | 1.2575 | 0.3515 | 0.3615 | 0.3744 | 0.6385 |
+| GraphSAGE-TEG-Gate | 0.2420 | 1.2325 | 0.2665 | 0.2808 | 0.3675 | 0.7192 |
+| SGFormer-TEG-Gate | 0.3002 | 1.2776 | 0.3532 | 0.3692 | 0.3701 | 0.6308 |
+
+Notes:
+
+- `High FN` is the high-risk false-negative rate for labels 6-8.
+- Values are computed from `paper comparison Split B, 10 seeds, common full loss`, `eval_split=data_2021_test`, and rounded to four decimals.

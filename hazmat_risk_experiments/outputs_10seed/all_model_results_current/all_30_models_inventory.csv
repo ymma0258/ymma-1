@@ -1,0 +1,31 @@
+﻿model,model_type,node_prediction,pyvrp_set_a,pyvrp_set_b,od_validation
+GAT,formal_trained_model,available,available,available,available
+GCN,formal_trained_model,available,available,available,available
+Gradformer-adapted,formal_trained_model,available,available,available,available
+GraphSAGE,formal_trained_model,available,available,available,available
+GraphSAGE-TEG-Concat,formal_trained_model,available,available,available,available
+GraphSAGE-TEG-Gate,formal_trained_model,available,available,available,available
+SGFormer-adapted,formal_trained_model,available,available,available,available
+SGFormer-TEG-Concat,formal_trained_model,available,available,available,available
+SGFormer-TEG-Gate,formal_trained_model,available,available,available,available
+Stable-Tail GNN,formal_trained_model,available,available,available,available
+Stable-Tail w/o Tail Loss,formal_trained_model,available,available,available,available
+Stable-Tail-EdgeTail-a005,stable_tail_postprocess,not_applicable_postprocess,available,available,available
+Stable-Tail-EdgeTail-a010,stable_tail_postprocess,not_applicable_postprocess,available,available,available
+Stable-Tail-EdgeTail-a020,stable_tail_postprocess,not_applicable_postprocess,available,available,available
+Stable-Tail-EdgeTail-a030,stable_tail_postprocess,not_applicable_postprocess,available,available,available
+Stable-Tail-Gate,formal_trained_model,available,available,available,available
+Stable-Tail-MatrixEns-r005,stable_tail_postprocess,not_applicable_postprocess,available,available,available
+Stable-Tail-MatrixEns-r010,stable_tail_postprocess,not_applicable_postprocess,available,available,available
+Stable-Tail-MatrixEns-r020,stable_tail_postprocess,not_applicable_postprocess,available,available,available
+Stable-Tail-MatrixEns-r030,stable_tail_postprocess,not_applicable_postprocess,available,available,available
+Stable-Tail-MatrixEns-r040,stable_tail_postprocess,not_applicable_postprocess,available,available,available
+Stable-Tail-NodeCalib-a005,stable_tail_postprocess,not_applicable_postprocess,available,available,available
+Stable-Tail-NodeCalib-a010,stable_tail_postprocess,not_applicable_postprocess,available,available,available
+Stable-Tail-NodeCalib-a020,stable_tail_postprocess,not_applicable_postprocess,available,available,available
+Stable-Tail-NodeCalib-a030,stable_tail_postprocess,not_applicable_postprocess,available,available,available
+Stable-Tail-TailOnly-a005,stable_tail_postprocess,not_applicable_postprocess,available,available,available
+Stable-Tail-TailOnly-a010,stable_tail_postprocess,not_applicable_postprocess,available,available,available
+Stable-Tail-TailOnly-a020,stable_tail_postprocess,not_applicable_postprocess,available,available,available
+Stable-Tail-TailOnly-a030,stable_tail_postprocess,not_applicable_postprocess,available,available,available
+TEG-only,formal_trained_model,available,available,available,available

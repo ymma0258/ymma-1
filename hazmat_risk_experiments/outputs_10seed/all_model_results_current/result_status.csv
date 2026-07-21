@@ -1,0 +1,10 @@
+﻿result_group,status,rows,reason
+primary_node_test,valid,13,one 10-seed data_2021_test aggregate per formal model
+primary_budget_sweep,valid,13 A/B + 26 per-set,all 13 formal models present
+primary_od_validation,valid,26,"13 models x 2 methods, each with 10 seeds"
+calibration_risk_matrices,valid,170,17 configurations x 10 seeds; all schema v3
+calibration_od_validation,valid,34,17 configurations x 2 methods; newer than schema-v3 exports; no failures
+calibration_pyvrp,valid,170,fresh
+calibration_common_route,valid,1700,fresh
+calibration_load_aware,valid,1700,fresh
+calibration_budget_sweep,valid,34,fresh

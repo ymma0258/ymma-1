@@ -1,0 +1,36 @@
+{
+  "schema_version": 3,
+  "name": "stable_tail_tail_only_alpha030_q090_splitB_seed0_floor_0p01",
+  "method": "tail_only_correction",
+  "alpha": 0.3,
+  "rho": 0.2,
+  "tail_quantile": 0.9,
+  "tail_sharpness": 20.0,
+  "hard_tail": false,
+  "high_risk_threshold": 0.5,
+  "year": "data_2021",
+  "clip": true,
+  "base_risk_dir": "D:\\PyVRP-main\\hazmat_risk_experiments\\outputs_10seed\\risk_matrices\\stable_tail_gnn_splitB_seed0_epochs50_paper_comparison_10seed_floor_0p01",
+  "source_fingerprints": {
+    "data_2021_node_risk.npz": "b907c2d7350d50fc30a9126aaff585e88a92cdc1a2a1d82462ba57787c775191",
+    "data_2021_edge_risk.npz": "80aec18ef7d0ee28236e98072ddf17d827b192952634de18d136aae39d5b3f9a"
+  },
+  "fallbacks": [],
+  "summaries": [
+    {
+      "year": "data_2021",
+      "edge_count": 7647,
+      "base_mean": 0.015310771763247476,
+      "risk_mean": 0.01659258233818223,
+      "risk_p90": 0.0082973912358284,
+      "risk_p95": 0.0649553500115871,
+      "risk_max": 0.8651409149169922,
+      "clip_upper": 0.8651409149169922,
+      "high_risk_gate": "P_high if P_high >= high_risk_threshold else 0",
+      "active_high_risk_nodes": 83,
+      "formula": "R_final = R_base + alpha * tail_gate * w_raw * max(P_high_active_i,P_high_active_j)",
+      "q_tail": 0.0082973912358284,
+      "tail_gate": "sigmoid"
+    }
+  ]
+}

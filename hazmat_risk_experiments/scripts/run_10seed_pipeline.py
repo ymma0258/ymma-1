@@ -48,6 +48,10 @@ FUSION_COMPARISON_TAG = "paper_teg_concat_fusions_10seed"
 FUSION_MODELS = "graphsage_teg_concat,sgformer_teg_concat"
 GATE_COMPARISON_TAG = "paper_teg_gate_fusions_10seed"
 GATE_MODELS = "sgformer_teg_gate,graphsage_teg_gate"
+STABLE_TAIL_GATE_TAG = "paper_stable_tail_gate_10seed"
+STABLE_TAIL_GATE_MODEL = "stable_tail_gate"
+CALIBRATION_ALPHAS = (0.05, 0.10, 0.20, 0.30)
+CALIBRATION_RHOS = (0.05, 0.10, 0.20, 0.30, 0.40)
 
 
 def parse_args() -> argparse.Namespace:
@@ -70,7 +74,7 @@ def parse_args() -> argparse.Namespace:
             "paper_models,strong_models,fusion_models,gate_models,"
             "paper_risk,strong_risk,fusion_risk,gate_risk,paper_tables,"
             "paper_od,strong_od,fusion_od,gate_od,paper_pyvrp,strong_pyvrp,"
-            "fusion_pyvrp,gate_pyvrp,gate_load_eval,customer_sets,"
+            "fusion_pyvrp,gate_pyvrp,gate_load_eval,budget_sweep,customer_sets,"
             "consistency_checks"
         ),
         help=(
@@ -79,7 +83,14 @@ def parse_args() -> argparse.Namespace:
             "paper_models,paper_tables,paper_risk,paper_od,paper_pyvrp,"
             "strong_models,strong_risk,strong_od,strong_pyvrp,paper_load_eval,"
             "fusion_models,fusion_risk,fusion_od,fusion_pyvrp,fusion_load_eval,"
-            "gate_models,gate_risk,gate_od,gate_pyvrp,gate_load_eval. The paper_* stages "
+            "gate_models,gate_risk,gate_od,gate_pyvrp,gate_load_eval,budget_sweep,"
+            "stable_tail_gate_models,stable_tail_gate_risk,stable_tail_gate_od,"
+            "stable_tail_gate_pyvrp,stable_tail_gate_load_eval,"
+            "stable_tail_calibration_raw_risk,stable_tail_calibration_raw_od,"
+            "stable_tail_calibration_raw_pyvrp,stable_tail_calibration_raw_budget_sweep,"
+            "stable_tail_calibration_gate05_risk,stable_tail_calibration_gate05_od,"
+            "stable_tail_calibration_gate05_pyvrp,stable_tail_calibration_gate05_budget_sweep. "
+            "The paper_* stages "
             "run the new GCN/GAT/GraphSAGE/TEG-only/Stable-Tail comparison."
         ),
     )
@@ -120,6 +131,16 @@ def write_csv(path: Path, rows: list[dict[str, object]]) -> None:
 def read_csv(path: Path) -> list[dict[str, str]]:
     with path.open(newline="", encoding="utf-8") as handle:
         return list(csv.DictReader(handle))
+
+
+def summary_is_current(
+    summary_path: Path, sources: list[tuple[str, Path]], year: str = "data_2021"
+) -> bool:
+    if not summary_path.exists():
+        return False
+    summary_mtime = summary_path.stat().st_mtime_ns
+    source_files = [path / f"{year}_edge_risk.npz" for _, path in sources]
+    return all(path.exists() and path.stat().st_mtime_ns <= summary_mtime for path in source_files)
 
 
 def mean_std(values: list[float]) -> tuple[float, float]:
@@ -196,10 +217,46 @@ def ensure_fixed_od_pairs(args: argparse.Namespace) -> Path:
             print(f"[od] rebuilt {len(pairs)} fixed OD pairs from {detail_path}")
             return dest
 
-    raise FileNotFoundError(
-        "Cannot find or rebuild fixed OD pairs. Run one OD comparison once or "
-        f"provide {dest} before running the OD stage."
+    bootstrap_batch = "fixed_od_pairs_bootstrap_10seed"
+    bootstrap_risk = risk_dir(
+        args.outputs_root,
+        paper_model_dir("stable_tail_gnn", 0),
     )
+    if not bootstrap_risk.exists():
+        raise FileNotFoundError(
+            "Cannot bootstrap fixed OD pairs because the paper Stable-Tail "
+            f"seed 0 risk matrix is missing: {bootstrap_risk}"
+        )
+    run(
+        [
+            PYTHON,
+            "-B",
+            script("validate_od_paths.py"),
+            "--risk-dir",
+            str(bootstrap_risk),
+            "--output-dir",
+            str(od_root(args.outputs_root)),
+            "--pairs-per-group",
+            "50",
+            "--k-paths",
+            "50",
+            "--cvar-alpha",
+            "0.9",
+            "--re-threshold",
+            "p75",
+            "--seed",
+            "0",
+            "--batch-name",
+            bootstrap_batch,
+        ],
+        dry_run=False,
+    )
+    generated = od_root(args.outputs_root) / bootstrap_batch / "od_pairs.csv"
+    if not generated.exists():
+        raise FileNotFoundError(f"Failed to bootstrap fixed OD pairs: {generated}")
+    shutil.copy2(generated, dest)
+    print(f"[od] bootstrapped fixed OD pairs from {generated}")
+    return dest
 
 
 def fixed_instance_meta_paths(args: argparse.Namespace) -> dict[str, Path]:
@@ -257,7 +314,10 @@ def ensure_fixed_instance_meta(args: argparse.Namespace) -> dict[str, Path]:
         return meta_paths
 
     first_seed = parse_seed_csv(args.seeds)[0]
-    stable_risk = risk_dir(args.outputs_root, stable_tail_dir(first_seed))
+    stable_risk = risk_dir(
+        args.outputs_root,
+        paper_model_dir("stable_tail_gnn", first_seed),
+    )
     for customer_set, dest in meta_paths.items():
         if dest.exists():
             continue
@@ -375,6 +435,13 @@ def gate_model_dir(model: str, seed: int) -> str:
     )
 
 
+def stable_tail_gate_dir(seed: int) -> str:
+    return (
+        f"stable_tail_gate_splitB_seed{seed}_epochs50_"
+        f"{STABLE_TAIL_GATE_TAG}_floor_0p01"
+    )
+
+
 def fusion_dir(seed: int, rho: str) -> str:
     return f"fusion_gcn_teg_low_rho{rho}_splitB_seed{seed}_epochs50_10seed_floor_0p01"
 
@@ -427,6 +494,7 @@ MODEL_RISK_DIRS = {
     "GraphSAGE-TEG-Gate": lambda seed: gate_model_dir(
         "graphsage_teg_gate", seed
     ),
+    "Stable-Tail-Gate": stable_tail_gate_dir,
 }
 
 
@@ -438,6 +506,54 @@ def risk_sources(args: argparse.Namespace, model_names: list[str]) -> list[tuple
             label = f"{model}_seed{seed}"
             sources.append((label, risk_dir(args.outputs_root, dir_fn(seed))))
     return sources
+
+
+def calibration_code(value: float) -> str:
+    return f"{round(value * 100):03d}"
+
+
+def calibration_mode_tag(p_high_mode: str) -> str:
+    if p_high_mode == "raw":
+        return "raw"
+    if p_high_mode == "gate":
+        return "gate05"
+    raise ValueError(f"Unknown P_high mode: {p_high_mode}")
+
+
+def calibration_configurations(p_high_mode: str = "raw") -> list[tuple[str, str]]:
+    tag = calibration_mode_tag(p_high_mode)
+    display = "Raw" if p_high_mode == "raw" else "Gate05"
+    configs: list[tuple[str, str]] = []
+    for alpha in CALIBRATION_ALPHAS:
+        code = calibration_code(alpha)
+        configs.extend(
+            [
+                (f"Stable-Tail-EdgeTail{display}-a{code}", f"stable_tail_edge_tail_{tag}_a{code}"),
+                (
+                    f"Stable-Tail-TailOnly{display}-a{code}",
+                    f"stable_tail_tail_only_{tag}_a{code}",
+                ),
+                (f"Stable-Tail-NodeCalib{display}-a{code}", f"stable_tail_node_calib_{tag}_a{code}"),
+            ]
+        )
+    for rho in CALIBRATION_RHOS:
+        code = calibration_code(rho)
+        configs.append(
+            (f"Stable-Tail-MatrixEns{display}-r{code}", f"stable_tail_matrix_ens_{tag}_r{code}")
+        )
+    return configs
+
+
+def calibration_sources(args: argparse.Namespace, p_high_mode: str = "raw") -> list[tuple[str, Path]]:
+    return [
+        (
+            f"{label}_seed{seed}",
+            risk_root(args.outputs_root)
+            / f"{stem}_splitB_seed{seed}_floor_0p01",
+        )
+        for label, stem in calibration_configurations(p_high_mode)
+        for seed in parse_seed_csv(args.seeds)
+    ]
 
 
 def source_args(sources: list[tuple[str, Path]]) -> list[str]:
@@ -486,6 +602,7 @@ def run_dirs_for_chunked_batch(
     return run_dirs
 
 
+# Legacy exploratory stages. Not used by the final paper pipeline.
 def stage_models(args: argparse.Namespace) -> None:
     out = model_dir(args.outputs_root)
     base = [
@@ -659,6 +776,31 @@ def stage_gate_models(args: argparse.Namespace) -> None:
     )
 
 
+def stage_stable_tail_gate_models(args: argparse.Namespace) -> None:
+    run(
+        [
+            PYTHON,
+            "-B",
+            script("run_model_experiments.py"),
+            "--output-dir",
+            str(model_dir(args.outputs_root)),
+            "--splits",
+            "B",
+            "--seeds",
+            args.seeds,
+            "--epochs",
+            str(args.epochs),
+            "--models",
+            STABLE_TAIL_GATE_MODEL,
+            "--batch-name",
+            "paper_stable_tail_gate_splitB_10seed",
+            "--experiment-tag",
+            STABLE_TAIL_GATE_TAG,
+        ],
+        args.dry_run,
+    )
+
+
 def stage_node_tables(args: argparse.Namespace) -> None:
     out_dir = model_dir(args.outputs_root) / "node_risk_eval_tables_10seed"
     paper_dir = args.final_root / "paper_results" / "02_model_results"
@@ -735,6 +877,7 @@ def export_base(
     run(cmd, args.dry_run)
 
 
+# Legacy exploratory stages. Not used by the final paper pipeline.
 def stage_risk(args: argparse.Namespace) -> None:
     export_base(args, "gcn,weighted_gcn,edge_gat", "10seed")
     export_base(args, "teg_gnn", "teg_low_tail_10seed", LOW_TAIL_ARGS)
@@ -979,6 +1122,7 @@ def stage_gate_risk(args: argparse.Namespace) -> None:
     )
 
 
+# Legacy exploratory stages. Not used by the final paper pipeline.
 def stage_od(args: argparse.Namespace) -> None:
     sources = risk_sources(
         args,
@@ -1145,6 +1289,34 @@ def stage_gate_od(args: argparse.Namespace) -> None:
         aggregate_od_model_summary(od_root(args.outputs_root) / batch_name)
 
 
+def stage_stable_tail_gate_od(args: argparse.Namespace) -> None:
+    sources = risk_sources(args, ["Stable-Tail-Gate"])
+    batch_name = "paper_stable_tail_gate_od_10seed"
+    run(
+        [
+            PYTHON,
+            "-B",
+            script("compare_model_od_paths.py"),
+            *source_args(sources),
+            "--pairs",
+            str(ensure_fixed_od_pairs(args)),
+            "--output-dir",
+            str(od_root(args.outputs_root)),
+            "--batch-name",
+            batch_name,
+            "--k-paths",
+            "50",
+            "--cvar-alpha",
+            "0.9",
+            "--re-threshold",
+            "p75",
+        ],
+        args.dry_run,
+    )
+    if not args.dry_run:
+        aggregate_od_model_summary(od_root(args.outputs_root) / batch_name)
+
+
 def aggregate_pyvrp_summary(batch_dir: Path, output_name: str) -> None:
     src = batch_dir / "model_pyvrp_summary.csv"
     if not src.exists():
@@ -1233,7 +1405,11 @@ def run_pyvrp_chunked(
                 else ["missing failure manifest"]
             )
             rows = read_csv(summary_path) if summary_path.exists() else []
-            if len(rows) == expected_rows and not failures:
+            if (
+                len(rows) == expected_rows
+                and not failures
+                and summary_is_current(summary_path, [(label, path)])
+            ):
                 print(f"[skip] existing complete PyVRP chunk {chunk_name}")
                 continue
         commands.append(
@@ -1340,6 +1516,7 @@ def aggregate_concentration_improvements(batch_dir: Path) -> None:
     write_csv(batch_dir / "stable_tail_lambda1_improvement_by_set_10seed.csv", summary)
 
 
+# Legacy exploratory stages. Not used by the final paper pipeline.
 def stage_pyvrp(args: argparse.Namespace) -> None:
     stable_sources = risk_sources(args, ["Stable-Tail-GNN"])
     beta_batch = "stable_tail_pyvrp50_beta_curve_10seed"
@@ -1489,6 +1666,71 @@ def stage_gate_pyvrp(args: argparse.Namespace) -> None:
         aggregate_pyvrp_summary(
             batch_dir, "paper_teg_gate_fusion_pyvrp_summary_10seed.csv"
         )
+
+
+def stage_stable_tail_gate_pyvrp(args: argparse.Namespace) -> None:
+    sources = risk_sources(args, ["Stable-Tail-Gate"])
+    batch = "paper_stable_tail_gate_pyvrp_budget_sweep_10seed"
+    chunks = run_pyvrp_chunked(
+        args,
+        sources,
+        batch,
+        "0,0.25,0.5,1.0,2.0",
+        "0",
+    )
+    if not args.dry_run:
+        batch_dir = merge_pyvrp_chunks(args, batch, chunks)
+        aggregate_pyvrp_summary(
+            batch_dir, "paper_stable_tail_gate_pyvrp_summary_10seed.csv"
+        )
+    # Keep the explicit four-stage command closed: once routes exist, produce
+    # their common-reference and load-aware evaluations as well.
+    stage_stable_tail_gate_load_eval(args)
+
+
+def stage_stable_tail_gate_load_eval(args: argparse.Namespace) -> None:
+    sources = risk_sources(args, ["Stable-Tail-Gate"])
+    run_dirs = run_dirs_for_chunked_batch(
+        args, "paper_stable_tail_gate_pyvrp_budget_sweep_10seed", sources
+    )
+    run_list = write_run_list(
+        pyvrp_root(args.outputs_root) / "paper_stable_tail_gate_run_list_10seed.csv",
+        run_dirs,
+    )
+    common_args = [
+        "--run-list",
+        str(run_list),
+        "--common-risk-dir",
+        str(risk_dir(args.outputs_root, paper_common_reference_dir())),
+        "--output-dir",
+        str(pyvrp_root(args.outputs_root)),
+        "--betas",
+        "0,0.25,0.5,1.0,2.0",
+        "--lambda-concentration",
+        "0",
+    ]
+    run(
+        [
+            PYTHON,
+            "-B",
+            script("common_evaluate_pyvrp_routes.py"),
+            *common_args,
+            "--batch-name",
+            "paper_stable_tail_gate_common_eval_10seed",
+        ],
+        args.dry_run,
+    )
+    run(
+        [
+            PYTHON,
+            "-B",
+            script("common_evaluate_load_aware_routes.py"),
+            *common_args,
+            "--batch-name",
+            "paper_stable_tail_gate_load_eval_10seed",
+        ],
+        args.dry_run,
+    )
 
 
 def stage_paper_load_eval(args: argparse.Namespace) -> None:
@@ -1698,6 +1940,285 @@ def stage_gate_load_eval(args: argparse.Namespace) -> None:
         ],
         args.dry_run,
     )
+
+
+def stage_budget_sweep(args: argparse.Namespace) -> None:
+    """Summarize existing paper PyVRP/common/load results over B=10%--40%."""
+    pyvrp = pyvrp_root(args.outputs_root)
+    self_summaries = [
+        pyvrp / "paper_model_pyvrp_budget_sweep_10seed" / "model_pyvrp_summary.csv",
+        pyvrp / "paper_strong_pyvrp_budget_sweep_10seed" / "model_pyvrp_summary.csv",
+        pyvrp
+        / "paper_teg_concat_fusion_pyvrp_budget_sweep_10seed"
+        / "model_pyvrp_summary.csv",
+        pyvrp
+        / "paper_teg_gate_fusion_pyvrp_budget_sweep_10seed"
+        / "model_pyvrp_summary.csv",
+    ]
+    stable_self = (
+        pyvrp
+        / "paper_stable_tail_gate_pyvrp_budget_sweep_10seed"
+        / "model_pyvrp_summary.csv"
+    )
+    stable_common = (
+        pyvrp
+        / "paper_stable_tail_gate_common_eval_10seed"
+        / "common_route_summary.csv"
+    )
+    stable_load = (
+        pyvrp
+        / "paper_stable_tail_gate_load_eval_10seed"
+        / "load_aware_summary.csv"
+    )
+    extra_args: list[str] = []
+    if stable_self.exists() and stable_common.exists() and stable_load.exists():
+        self_summaries.append(stable_self)
+        extra_args = [
+            "--extra-common-summaries",
+            str(stable_common),
+            "--extra-load-summaries",
+            str(stable_load),
+        ]
+    run(
+        [
+            PYTHON,
+            "-B",
+            script("summarize_paper_budget_sweep.py"),
+            "--self-summaries",
+            *(str(path) for path in self_summaries),
+            "--common-summary",
+            str(
+                pyvrp
+                / "paper_all_models_with_gate_common_eval_10seed"
+                / "common_route_summary.csv"
+            ),
+            "--load-summary",
+            str(
+                pyvrp
+                / "paper_all_models_with_gate_load_eval_10seed"
+                / "load_aware_summary.csv"
+            ),
+            *extra_args,
+            "--output-dir",
+            str(pyvrp / "paper_budget_sweep_10seed"),
+            "--final-root",
+            str(args.final_root),
+        ],
+        args.dry_run,
+    )
+
+
+def stage_stable_tail_gate_risk(args: argparse.Namespace) -> None:
+    export_base(
+        args,
+        STABLE_TAIL_GATE_MODEL,
+        STABLE_TAIL_GATE_TAG,
+        checkpoint_tag=STABLE_TAIL_GATE_TAG,
+    )
+
+
+def stage_stable_tail_calibration_risk_mode(
+    args: argparse.Namespace, p_high_mode: str
+) -> None:
+    run(
+        [
+            PYTHON,
+            "-B",
+            script("run_stable_tail_calibration_exports.py"),
+            "--outputs-root",
+            str(args.outputs_root),
+            "--seeds",
+            args.seeds,
+            "--base-pattern",
+            "stable_tail_gnn_splitB_seed{seed}_epochs50_paper_comparison_10seed_floor_0p01",
+            "--methods",
+            "edge_tail_correction,tail_only_correction,node_calibration,risk_matrix_ensemble",
+            "--alphas",
+            ",".join(str(value) for value in CALIBRATION_ALPHAS),
+            "--rhos",
+            ",".join(str(value) for value in CALIBRATION_RHOS),
+            "--p-high-modes",
+            p_high_mode,
+            "--p-high-gate-threshold",
+            "0.5",
+        ],
+        args.dry_run,
+    )
+
+
+def stage_stable_tail_calibration_od_mode(
+    args: argparse.Namespace, p_high_mode: str
+) -> None:
+    tag = calibration_mode_tag(p_high_mode)
+    pairs = ensure_fixed_od_pairs(args)
+    chunk_names: list[str] = []
+    commands: list[list[str]] = []
+    for label, _stem in calibration_configurations(p_high_mode):
+        sources = [
+            source for source in calibration_sources(args, p_high_mode) if source[0].startswith(f"{label}_seed")
+        ]
+        chunk_name = f"stable_tail_calibration_{tag}_od_10seed__{safe_name(label)}"
+        chunk_names.append(chunk_name)
+        chunk_dir = od_root(args.outputs_root) / chunk_name
+        if not args.dry_run:
+            summary_path = chunk_dir / "model_od_summary.csv"
+            failure_path = chunk_dir / "model_od_failures.json"
+            rows = read_csv(summary_path) if summary_path.exists() else []
+            failures = json.loads(failure_path.read_text(encoding="utf-8")) if failure_path.exists() else ["missing"]
+            if (
+                len(rows) == 2 * len(sources)
+                and not failures
+                and summary_is_current(summary_path, sources)
+            ):
+                print(f"[skip] existing complete OD chunk {chunk_name}")
+                continue
+        commands.append(
+            [
+                PYTHON,
+                "-B",
+                script("compare_model_od_paths.py"),
+                *source_args(sources),
+                "--pairs",
+                str(pairs),
+                "--output-dir",
+                str(od_root(args.outputs_root)),
+                "--batch-name",
+                chunk_name,
+                "--k-paths",
+                "50",
+                "--cvar-alpha",
+                "0.9",
+                "--re-threshold",
+                "p75",
+            ]
+        )
+    workers = max(1, min(args.pyvrp_workers, len(commands)))
+    if workers == 1 or args.dry_run:
+        for cmd in commands:
+            run(cmd, args.dry_run)
+    else:
+        print(f"[od] running {len(commands)} calibration chunks with {workers} workers")
+        with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as pool:
+            futures = [pool.submit(run, cmd, False) for cmd in commands]
+            for future in concurrent.futures.as_completed(futures):
+                future.result()
+    if not args.dry_run:
+        master = od_root(args.outputs_root) / f"stable_tail_calibration_{tag}_od_10seed"
+        master.mkdir(parents=True, exist_ok=True)
+        rows: list[dict[str, object]] = []
+        failures: list[dict[str, object]] = []
+        for chunk_name in chunk_names:
+            chunk = od_root(args.outputs_root) / chunk_name
+            rows.extend(read_csv(chunk / "model_od_summary.csv"))
+            failure_path = chunk / "model_od_failures.json"
+            if failure_path.exists():
+                failures.extend(json.loads(failure_path.read_text(encoding="utf-8")))
+        write_csv(master / "model_od_summary.csv", rows)
+        (master / "model_od_failures.json").write_text(
+            json.dumps(failures, ensure_ascii=False, indent=2), encoding="utf-8"
+        )
+        aggregate_od_model_summary(master)
+
+
+def stage_stable_tail_calibration_pyvrp_mode(
+    args: argparse.Namespace, p_high_mode: str
+) -> None:
+    if not args.dry_run:
+        probe = subprocess.run(
+            [PYTHON, "-c", "import pyvrp"],
+            capture_output=True,
+            text=True,
+        )
+        if probe.returncode != 0:
+            raise RuntimeError(
+                "PyVRP is unavailable in the current Python interpreter "
+                f"({PYTHON}). Run the pipeline with "
+                "PyVRP-main\\.venv\\Scripts\\python.exe."
+            )
+    tag = calibration_mode_tag(p_high_mode)
+    sources = calibration_sources(args, p_high_mode)
+    batch = f"stable_tail_calibration_{tag}_pyvrp_10seed"
+    chunks = run_pyvrp_chunked(args, sources, batch, "0,0.25,0.5,1.0,2.0", "0")
+    if not args.dry_run:
+        batch_dir = merge_pyvrp_chunks(args, batch, chunks)
+        aggregate_pyvrp_summary(batch_dir, f"stable_tail_calibration_{tag}_pyvrp_summary_10seed.csv")
+    run_dirs = run_dirs_for_chunked_batch(args, batch, sources)
+    run_list = pyvrp_root(args.outputs_root) / f"stable_tail_calibration_{tag}_run_list_10seed.csv"
+    if not args.dry_run:
+        write_run_list(run_list, run_dirs)
+    common_args = [
+        "--run-list",
+        str(run_list),
+        "--common-risk-dir",
+        str(risk_dir(args.outputs_root, paper_common_reference_dir())),
+        "--output-dir",
+        str(pyvrp_root(args.outputs_root)),
+        "--betas",
+        "0,0.25,0.5,1.0,2.0",
+        "--lambda-concentration",
+        "0",
+    ]
+    run(
+        [PYTHON, "-B", script("common_evaluate_pyvrp_routes.py"), *common_args, "--batch-name", f"stable_tail_calibration_{tag}_common_eval_10seed"],
+        args.dry_run,
+    )
+    run(
+        [PYTHON, "-B", script("common_evaluate_load_aware_routes.py"), *common_args, "--batch-name", f"stable_tail_calibration_{tag}_load_eval_10seed"],
+        args.dry_run,
+    )
+
+
+def stage_stable_tail_calibration_budget_sweep_mode(
+    args: argparse.Namespace, p_high_mode: str
+) -> None:
+    tag = calibration_mode_tag(p_high_mode)
+    pyvrp = pyvrp_root(args.outputs_root)
+    run(
+        [
+            PYTHON,
+            "-B",
+            script("summarize_stable_tail_calibration.py"),
+            "--self-summary",
+            str(pyvrp / f"stable_tail_calibration_{tag}_pyvrp_10seed" / "model_pyvrp_summary.csv"),
+            "--common-summary",
+            str(pyvrp / f"stable_tail_calibration_{tag}_common_eval_10seed" / "common_route_summary.csv"),
+            "--load-summary",
+            str(pyvrp / f"stable_tail_calibration_{tag}_load_eval_10seed" / "load_aware_summary.csv"),
+            "--baseline-summary",
+            str(pyvrp / "paper_budget_sweep_10seed" / "budget_sweep_summary.csv"),
+            "--baseline-ab",
+            str(pyvrp / "paper_budget_sweep_10seed" / "budget_sweep_ab_average.csv"),
+            "--source-manifest",
+            str(risk_root(args.outputs_root) / f"stable_tail_calibration_{tag}_sources_10seed.csv"),
+            "--output-dir",
+            str(pyvrp / f"stable_tail_calibration_{tag}_budget_sweep_10seed"),
+            "--p-high-mode",
+            p_high_mode,
+            "--final-root",
+            str(args.final_root),
+        ],
+        args.dry_run,
+    )
+
+
+# Backward-compatible aliases now resolve to the formal raw-P_high pipeline.
+def stage_stable_tail_calibration_risk(args: argparse.Namespace) -> None:
+    stage_stable_tail_calibration_risk_mode(args, "raw")
+
+
+def stage_stable_tail_calibration_od(args: argparse.Namespace) -> None:
+    stage_stable_tail_calibration_od_mode(args, "raw")
+
+
+def stage_stable_tail_calibration_pyvrp(args: argparse.Namespace) -> None:
+    stage_stable_tail_calibration_pyvrp_mode(args, "raw")
+
+
+def stage_stable_tail_calibration_budget_sweep(args: argparse.Namespace) -> None:
+    stage_stable_tail_calibration_budget_sweep_mode(args, "raw")
+
+
+# Legacy exploratory stages. Not used by the final paper pipeline.
 def stage_concentration(args: argparse.Namespace) -> None:
     stable_sources = risk_sources(args, ["Stable-Tail-GNN"])
     batch = "stable_tail_concentration_beta1_lambda0_1_10seed"
@@ -1809,6 +2330,8 @@ def main() -> None:
         stage_fusion_models(args)
     if "gate_models" in stages:
         stage_gate_models(args)
+    if "stable_tail_gate_models" in stages:
+        stage_stable_tail_gate_models(args)
     if "node_tables" in stages:
         stage_node_tables(args)
     if "paper_tables" in stages:
@@ -1823,6 +2346,14 @@ def main() -> None:
         stage_fusion_risk(args)
     if "gate_risk" in stages:
         stage_gate_risk(args)
+    if "stable_tail_gate_risk" in stages:
+        stage_stable_tail_gate_risk(args)
+    if "stable_tail_calibration_risk" in stages:
+        stage_stable_tail_calibration_risk(args)
+    if "stable_tail_calibration_raw_risk" in stages:
+        stage_stable_tail_calibration_risk_mode(args, "raw")
+    if "stable_tail_calibration_gate05_risk" in stages:
+        stage_stable_tail_calibration_risk_mode(args, "gate")
     if "od" in stages:
         stage_od(args)
     if "paper_od" in stages:
@@ -1833,6 +2364,14 @@ def main() -> None:
         stage_fusion_od(args)
     if "gate_od" in stages:
         stage_gate_od(args)
+    if "stable_tail_gate_od" in stages:
+        stage_stable_tail_gate_od(args)
+    if "stable_tail_calibration_od" in stages:
+        stage_stable_tail_calibration_od(args)
+    if "stable_tail_calibration_raw_od" in stages:
+        stage_stable_tail_calibration_od_mode(args, "raw")
+    if "stable_tail_calibration_gate05_od" in stages:
+        stage_stable_tail_calibration_od_mode(args, "gate")
     if "pyvrp" in stages:
         stage_pyvrp(args)
     if "paper_pyvrp" in stages:
@@ -1843,12 +2382,33 @@ def main() -> None:
         stage_fusion_pyvrp(args)
     if "gate_pyvrp" in stages:
         stage_gate_pyvrp(args)
+    if "stable_tail_gate_pyvrp" in stages:
+        stage_stable_tail_gate_pyvrp(args)
+    if "stable_tail_calibration_pyvrp" in stages:
+        stage_stable_tail_calibration_pyvrp(args)
+    if "stable_tail_calibration_raw_pyvrp" in stages:
+        stage_stable_tail_calibration_pyvrp_mode(args, "raw")
+    if "stable_tail_calibration_gate05_pyvrp" in stages:
+        stage_stable_tail_calibration_pyvrp_mode(args, "gate")
     if "paper_load_eval" in stages:
         stage_paper_load_eval(args)
     if "fusion_load_eval" in stages:
         stage_fusion_load_eval(args)
     if "gate_load_eval" in stages:
         stage_gate_load_eval(args)
+    if (
+        "stable_tail_gate_load_eval" in stages
+        and "stable_tail_gate_pyvrp" not in stages
+    ):
+        stage_stable_tail_gate_load_eval(args)
+    if "budget_sweep" in stages:
+        stage_budget_sweep(args)
+    if "stable_tail_calibration_budget_sweep" in stages:
+        stage_stable_tail_calibration_budget_sweep(args)
+    if "stable_tail_calibration_raw_budget_sweep" in stages:
+        stage_stable_tail_calibration_budget_sweep_mode(args, "raw")
+    if "stable_tail_calibration_gate05_budget_sweep" in stages:
+        stage_stable_tail_calibration_budget_sweep_mode(args, "gate")
     if "concentration" in stages:
         stage_concentration(args)
     if "customer_sets" in stages:

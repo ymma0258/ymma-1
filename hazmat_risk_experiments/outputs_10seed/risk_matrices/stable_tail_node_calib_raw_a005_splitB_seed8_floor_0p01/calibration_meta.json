@@ -1,0 +1,53 @@
+{
+  "schema_version": 4,
+  "name": "stable_tail_node_calib_raw_a005_splitB_seed8_floor_0p01",
+  "method": "node_calibration",
+  "alpha": 0.05,
+  "rho": 0.2,
+  "tail_quantile": 0.9,
+  "tail_sharpness": 20.0,
+  "hard_tail": false,
+  "p_high_mode": "raw",
+  "p_high_gate_threshold": 0.5,
+  "p_high_note": "P_high is used without thresholding.",
+  "p_high_raw_min": 7.974064258660931e-26,
+  "p_high_raw_max": 1.0,
+  "p_high_raw_mean": 0.05907505427360248,
+  "p_high_used_min": 7.974064258660931e-26,
+  "p_high_used_max": 1.0,
+  "p_high_used_mean": 0.05907505427360248,
+  "year": "data_2021",
+  "clip": true,
+  "base_risk_dir": "D:\\PyVRP-main\\hazmat_risk_experiments\\outputs_10seed\\risk_matrices\\stable_tail_gnn_splitB_seed8_epochs50_paper_comparison_10seed_floor_0p01",
+  "formula": "S_final=clip(S_base+alpha*E_mean*P_high_used,0,1); R_final=w_floor*max(S_final_i,S_final_j)",
+  "created_at": "2026-07-15T10:57:11.126639+00:00",
+  "source_fingerprints": {
+    "data_2021_node_risk.npz": "feb182e3271696b5423dec2be128d200b52716e600c541a036ddf11605da48db",
+    "data_2021_edge_risk.npz": "bd5e8fd1587e1222df2752b97f50fd56b028bd918c71ac8e3c9ca5e691565c15"
+  },
+  "fallbacks": [],
+  "summaries": [
+    {
+      "year": "data_2021",
+      "edge_count": 7647,
+      "base_mean": 0.015449529916931111,
+      "risk_mean": 0.015527524098051755,
+      "risk_p90": 0.00852831584435613,
+      "risk_p95": 0.07390295163827619,
+      "risk_max": 0.8591263890266418,
+      "clip_upper": 0.8591263890266418,
+      "p_high_mode": "raw",
+      "p_high_gate_threshold": 0.5,
+      "p_high_note": "P_high is used without thresholding.",
+      "p_high_raw_min": 7.974064258660931e-26,
+      "p_high_raw_max": 1.0,
+      "p_high_raw_mean": 0.05907505427360248,
+      "p_high_used_min": 7.974064258660931e-26,
+      "p_high_used_max": 1.0,
+      "p_high_used_mean": 0.05907505427360248,
+      "active_high_risk_nodes": 5261,
+      "formula": "S_final=clip(S_base+alpha*E_mean*P_high_used,0,1); R_final=w_floor*max(S_final_i,S_final_j)",
+      "node_exposure": "mean_incident_w_raw"
+    }
+  ]
+}

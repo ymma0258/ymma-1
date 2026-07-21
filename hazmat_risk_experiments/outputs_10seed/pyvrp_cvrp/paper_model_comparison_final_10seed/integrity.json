@@ -1,5 +1,5 @@
 {
-  "node_rows": 7,
+  "node_rows": 8,
   "ablation_rows": 4,
   "od_rows": 16,
   "self_rows": 800,
@@ -9,7 +9,7 @@
   "fixed_budget_detail_rows": 1120,
   "fixed_budget_summary_rows": 112,
   "significance_rows": 98,
-  "targeted_significance_rows": 84,
+  "targeted_significance_rows": 126,
   "cost_risk_auc_detail_rows": 160,
   "cost_risk_auc_summary_rows": 16,
   "auc_significance_rows": 14,

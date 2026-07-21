@@ -76,6 +76,7 @@ MODEL_CHOICES = [
     "teg_only",
     "gcn_teg_concat",
     "stable_tail_gnn",
+    "stable_tail_gate",
     "gcn_teg_residual_fixed",
     "gcn_teg_residual_learnable",
     "ua_gnn",
@@ -99,6 +100,7 @@ PAPER_MODEL_NAMES = {
     "teg_only": "TEG-only",
     "gcn_teg_concat": "Stable-Tail GNN",
     "stable_tail_gnn": "Stable-Tail GNN",
+    "stable_tail_gate": "Stable-Tail-Gate",
 }
 
 
@@ -862,6 +864,7 @@ class RiskModel(nn.Module):
         elif model in {
             "gcn_teg_concat",
             "stable_tail_gnn",
+            "stable_tail_gate",
             "gcn_teg_residual_fixed",
             "gcn_teg_residual_learnable",
             "ua_teg_gnn",
@@ -889,6 +892,16 @@ class RiskModel(nn.Module):
                     nn.Linear(2 * hidden_dim, hidden_dim),
                     nn.ReLU(),
                     nn.Dropout(dropout),
+                )
+            elif model == "stable_tail_gate":
+                # Per-channel node gate. Both Stable-Tail branches already
+                # produce hidden_dim features, so no projection is required.
+                self.gate = nn.Sequential(
+                    nn.Linear(2 * hidden_dim, hidden_dim),
+                    nn.ReLU(),
+                    nn.Dropout(dropout),
+                    nn.Linear(hidden_dim, hidden_dim),
+                    nn.Sigmoid(),
                 )
             elif model == "gcn_teg_residual_learnable":
                 self.mu = nn.Parameter(torch.tensor(0.1, dtype=torch.float32))
@@ -991,6 +1004,7 @@ class RiskModel(nn.Module):
         if self.model in {
             "gcn_teg_concat",
             "stable_tail_gnn",
+            "stable_tail_gate",
             "gcn_teg_residual_fixed",
             "gcn_teg_residual_learnable",
             "ua_teg_gnn",
@@ -1006,6 +1020,8 @@ class RiskModel(nn.Module):
                 "stable_tail_ec_gnn",
             }:
                 h = self.fusion(torch.cat([h_gcn, h_teg], dim=1))
+            elif self.model == "stable_tail_gate":
+                h = self._gate_fusion(h_gcn, h_teg)
             else:
                 mu = self.mu if self.mu is not None else h.new_tensor(0.1)
                 h = h_gcn + mu * h_teg

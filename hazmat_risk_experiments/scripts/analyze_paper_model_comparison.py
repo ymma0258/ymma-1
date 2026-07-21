@@ -93,11 +93,16 @@ MODEL_ORDER = [
 METRICS = [
     "common_global_risk_mean",
     "common_global_cvar90_mean",
+    "common_global_cvar95_mean",
+    "common_max_edge_risk_mean",
+    "common_high_risk_edge_hits_mean",
     "common_max_vehicle_risk_mean",
+    "common_max_vehicle_cvar90_mean",
     "common_edge_burden_gini_used_mean",
     "common_top10_burden_share_mean",
     "load_global_risk_mean",
     "load_cvar90_mean",
+    "load_cvar95_mean",
     "load_max_vehicle_risk_mean",
     "load_edge_burden_gini_used_mean",
     "load_top10_burden_share_mean",
@@ -324,7 +329,11 @@ def targeted_significance(
     }
     result: list[dict[str, object]] = []
     baselines = ["GraphSAGE", "TEG-only", "Stable-Tail w/o Tail Loss"]
-    metrics = ["common_global_risk_mean", "common_global_cvar90_mean"]
+    metrics = [
+        "common_global_risk_mean",
+        "common_global_cvar90_mean",
+        "common_global_cvar95_mean",
+    ]
     for customer_set in ("A", "B"):
         for budget in BUDGETS:
             for metric in metrics:
@@ -451,9 +460,15 @@ def cost_risk_auc(joined: list[dict[str, object]]) -> tuple[list[dict[str, objec
                 "max_budget": 0.40,
                 "common_risk_aubrc": lower_envelope_auc(rows, "common_global_risk_mean"),
                 "cvar90_aubrc": lower_envelope_auc(rows, "common_global_cvar90_mean"),
+                "cvar95_aubrc": lower_envelope_auc(rows, "common_global_cvar95_mean"),
                 "load_risk_aubrc": lower_envelope_auc(rows, "load_global_risk_mean"),
+                "load_cvar90_aubrc": lower_envelope_auc(rows, "load_cvar90_mean"),
+                "load_cvar95_aubrc": lower_envelope_auc(rows, "load_cvar95_mean"),
                 "max_vehicle_risk_aubrc": lower_envelope_auc(
                     rows, "common_max_vehicle_risk_mean"
+                ),
+                "max_vehicle_cvar90_aubrc": lower_envelope_auc(
+                    rows, "common_max_vehicle_cvar90_mean"
                 ),
             }
         )
@@ -471,8 +486,12 @@ def cost_risk_auc(joined: list[dict[str, object]]) -> tuple[list[dict[str, objec
         for metric in (
             "common_risk_aubrc",
             "cvar90_aubrc",
+            "cvar95_aubrc",
             "load_risk_aubrc",
+            "load_cvar90_aubrc",
+            "load_cvar95_aubrc",
             "max_vehicle_risk_aubrc",
+            "max_vehicle_cvar90_aubrc",
         ):
             avg, std = mean_std([float(row[metric]) for row in rows])
             out[f"{metric}_mean"] = avg
@@ -567,15 +586,34 @@ def all_model_summary(
                 {
                     f"{prefix}_risk20": budget20["common_global_risk_mean_mean"],
                     f"{prefix}_cvar90_20": budget20["common_global_cvar90_mean_mean"],
+                    f"{prefix}_cvar95_20": budget20["common_global_cvar95_mean_mean"],
+                    f"{prefix}_max_edge_risk20": budget20["common_max_edge_risk_mean_mean"],
+                    f"{prefix}_high_risk_edge_hits20": budget20[
+                        "common_high_risk_edge_hits_mean_mean"
+                    ],
                     f"{prefix}_load_risk20": budget20["load_global_risk_mean_mean"],
+                    f"{prefix}_load_cvar90_20": budget20["load_cvar90_mean_mean"],
+                    f"{prefix}_load_cvar95_20": budget20["load_cvar95_mean_mean"],
                     f"{prefix}_top10_share20": budget20["common_top10_burden_share_mean_mean"],
                     f"{prefix}_edge_gini20": budget20["common_edge_burden_gini_used_mean_mean"],
                     f"{prefix}_max_vehicle_risk20": budget20["common_max_vehicle_risk_mean_mean"],
+                    f"{prefix}_max_vehicle_cvar90_20": budget20[
+                        "common_max_vehicle_cvar90_mean_mean"
+                    ],
                     f"{prefix}_win_rate_10_40": wins["win_rate"],
                     f"{prefix}_average_risk_at_b": wins["average_common_risk_at_b"],
                     f"{prefix}_common_risk_aubrc": auc["common_risk_aubrc_mean"],
                     f"{prefix}_cvar90_aubrc": auc["cvar90_aubrc_mean"],
+                    f"{prefix}_cvar95_aubrc": auc["cvar95_aubrc_mean"],
                     f"{prefix}_load_risk_aubrc": auc["load_risk_aubrc_mean"],
+                    f"{prefix}_load_cvar90_aubrc": auc["load_cvar90_aubrc_mean"],
+                    f"{prefix}_load_cvar95_aubrc": auc["load_cvar95_aubrc_mean"],
+                    f"{prefix}_max_vehicle_risk_aubrc": auc[
+                        "max_vehicle_risk_aubrc_mean"
+                    ],
+                    f"{prefix}_max_vehicle_cvar90_aubrc": auc[
+                        "max_vehicle_cvar90_aubrc_mean"
+                    ],
                 }
             )
         result.append(out)
@@ -655,7 +693,15 @@ def write_report(
             f"{row['Recall@6-8']} | {row['PR-AUC']} | {row['High FN']} |"
         )
 
-    lines.extend(["", "## Fixed-budget common-risk comparison", "", "| Set | Budget | Model | Cost inc. | Common risk | CVaR90 |", "|---|---:|---|---:|---:|---:|"])
+    lines.extend(
+        [
+            "",
+            "## Fixed-budget common-risk comparison",
+            "",
+            "| Set | Budget | Model | Cost inc. | Common risk | CVaR90 | CVaR95 | Max edge risk |",
+            "|---|---:|---|---:|---:|---:|---:|---:|",
+        ]
+    )
     for customer_set in ("A", "B"):
         for budget in (0.20, 0.25, 0.30):
             rows = [row for row in budget_rows if row["customer_set"] == customer_set and row["budget"] == budget]
@@ -663,18 +709,31 @@ def write_report(
                 lines.append(
                     f"| {customer_set} | {budget:.0%} | {row['model']} | "
                     f"{float(row['cost_increase_mean']):.2%} | {float(row['common_global_risk_mean_mean']):.4f} | "
-                    f"{float(row['common_global_cvar90_mean_mean']):.4f} |"
+                    f"{float(row['common_global_cvar90_mean_mean']):.4f} | "
+                    f"{float(row['common_global_cvar95_mean_mean']):.4f} | "
+                    f"{float(row['common_max_edge_risk_mean_mean']):.4f} |"
                 )
 
-    lines.extend(["", "## Extended downstream metrics at B=20%", "", "| Set | Model | LoadRisk | Top10 burden share | Edge burden Gini | Max vehicle risk |", "|---|---|---:|---:|---:|---:|"])
+    lines.extend(
+        [
+            "",
+            "## Extended downstream metrics at B=20%",
+            "",
+            "| Set | Model | LoadRisk | Load CVaR90 | Load CVaR95 | Max vehicle risk | Max vehicle CVaR90 | Top10 burden share | Edge burden Gini |",
+            "|---|---|---:|---:|---:|---:|---:|---:|---:|",
+        ]
+    )
     for customer_set in ("A", "B"):
         rows = [row for row in budget_rows if row["customer_set"] == customer_set and row["budget"] == 0.20]
         for row in sorted(rows, key=lambda item: MODEL_ORDER.index(str(item["model"]))):
             lines.append(
                 f"| {customer_set} | {row['model']} | {float(row['load_global_risk_mean_mean']):.4f} | "
+                f"{float(row['load_cvar90_mean_mean']):.4f} | "
+                f"{float(row['load_cvar95_mean_mean']):.4f} | "
+                f"{float(row['common_max_vehicle_risk_mean_mean']):.4f} | "
+                f"{float(row['common_max_vehicle_cvar90_mean_mean']):.4f} | "
                 f"{float(row['common_top10_burden_share_mean_mean']):.2%} | "
-                f"{float(row['common_edge_burden_gini_used_mean_mean']):.4f} | "
-                f"{float(row['common_max_vehicle_risk_mean_mean']):.4f} |"
+                f"{float(row['common_edge_burden_gini_used_mean_mean']):.4f} |"
             )
 
     lines.extend(["", "## OD path validation (CVaR-risk)", "", "| Model | Hop inc. | Total risk reduction | CVaR90 reduction |", "|---|---:|---:|---:|"])
@@ -685,14 +744,26 @@ def write_report(
                 f"{float(row['total_risk_reduction_mean']):.2%} | {float(row['cvar90_reduction_mean']):.2%} |"
             )
 
-    lines.extend(["", "## Cost-risk AUBRC over 0-40% budget", "", "Lower is better; each curve is the lower envelope of observed beta candidates.", "", "| Set | Model | Common risk AUBRC | CVaR90 AUBRC | LoadRisk AUBRC | Max-vehicle risk AUBRC |", "|---|---|---:|---:|---:|---:|"])
+    lines.extend(
+        [
+            "",
+            "## Cost-risk AUBRC over 0-40% budget",
+            "",
+            "Lower is better; each curve is the lower envelope of observed beta candidates.",
+            "",
+            "| Set | Model | Common risk AUBRC | CVaR90 AUBRC | CVaR95 AUBRC | LoadRisk AUBRC | Load CVaR90 AUBRC | Max-vehicle risk AUBRC | Max-vehicle CVaR90 AUBRC |",
+            "|---|---|---:|---:|---:|---:|---:|---:|---:|",
+        ]
+    )
     for customer_set in ("A", "B"):
         rows = [row for row in auc_rows if row["customer_set"] == customer_set]
         for row in sorted(rows, key=lambda item: MODEL_ORDER.index(str(item["model"]))):
             lines.append(
                 f"| {customer_set} | {row['model']} | {float(row['common_risk_aubrc_mean']):.4f} | "
-                f"{float(row['cvar90_aubrc_mean']):.4f} | {float(row['load_risk_aubrc_mean']):.4f} | "
-                f"{float(row['max_vehicle_risk_aubrc_mean']):.4f} |"
+                f"{float(row['cvar90_aubrc_mean']):.4f} | {float(row['cvar95_aubrc_mean']):.4f} | "
+                f"{float(row['load_risk_aubrc_mean']):.4f} | {float(row['load_cvar90_aubrc_mean']):.4f} | "
+                f"{float(row['max_vehicle_risk_aubrc_mean']):.4f} | "
+                f"{float(row['max_vehicle_cvar90_aubrc_mean']):.4f} |"
             )
 
     lines.extend(["", "## Budget sweep: 10%-40%", "", "A win is the lowest common risk for the same model seed, customer set, and budget.", "", "| Set | Model | Wins | Comparisons | Win rate | Average Risk@B |", "|---|---|---:|---:|---:|---:|"])

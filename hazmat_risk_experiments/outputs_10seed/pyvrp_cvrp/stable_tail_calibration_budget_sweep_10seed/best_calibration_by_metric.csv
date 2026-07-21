@@ -1,0 +1,7 @@
+metric,model,value,method,alpha,rho
+avg_risk_at_b,Stable-Tail-MatrixEns-r010,4.005969526444026,risk_matrix_ensemble,0.1,0.1
+common_aubrc,Stable-Tail-MatrixEns-r010,1.171320239960568,risk_matrix_ensemble,0.1,0.1
+cvar90_aubrc,Stable-Tail-EdgeTail-a020,0.02834093329213882,edge_tail_correction,0.2,0.2
+cvar95_aubrc,Stable-Tail-MatrixEns-r010,0.05132307577319273,risk_matrix_ensemble,0.1,0.1
+load_cvar90_aubrc,Stable-Tail-MatrixEns-r010,0.016649487520189278,risk_matrix_ensemble,0.1,0.1
+max_vehicle_cvar90_aubrc,Stable-Tail-TailOnly-a005,0.05035934697033004,tail_only_correction,0.05,0.2

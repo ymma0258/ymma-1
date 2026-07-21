@@ -1,0 +1,7 @@
+metric,model,value,method,alpha,rho
+avg_risk_at_b,Stable-Tail-TailOnlyRaw-a030,3.972190397760407,tail_only_correction,0.3,0.2
+common_aubrc,Stable-Tail-TailOnlyRaw-a030,1.1622222847024295,tail_only_correction,0.3,0.2
+cvar90_aubrc,Stable-Tail-TailOnlyRaw-a030,0.028012552606605203,tail_only_correction,0.3,0.2
+cvar95_aubrc,Stable-Tail-TailOnlyRaw-a030,0.0510116991462926,tail_only_correction,0.3,0.2
+load_cvar90_aubrc,Stable-Tail-TailOnlyRaw-a030,0.0167393160187209,tail_only_correction,0.3,0.2
+max_vehicle_cvar90_aubrc,Stable-Tail-EdgeTailRaw-a030,0.04951128437066379,edge_tail_correction,0.3,0.2

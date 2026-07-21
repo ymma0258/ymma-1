@@ -1,0 +1,52 @@
+{
+  "schema_version": 4,
+  "name": "stable_tail_edge_tail_raw_a010_splitB_seed5_floor_0p01",
+  "method": "edge_tail_correction",
+  "alpha": 0.1,
+  "rho": 0.2,
+  "tail_quantile": 0.9,
+  "tail_sharpness": 20.0,
+  "hard_tail": false,
+  "p_high_mode": "raw",
+  "p_high_gate_threshold": 0.5,
+  "p_high_note": "P_high is used without thresholding.",
+  "p_high_raw_min": 6.58946589864102e-41,
+  "p_high_raw_max": 0.999822199344635,
+  "p_high_raw_mean": 0.06188228186889179,
+  "p_high_used_min": 6.58946589864102e-41,
+  "p_high_used_max": 0.999822199344635,
+  "p_high_used_mean": 0.06188228186889179,
+  "year": "data_2021",
+  "clip": true,
+  "base_risk_dir": "D:\\PyVRP-main\\hazmat_risk_experiments\\outputs_10seed\\risk_matrices\\stable_tail_gnn_splitB_seed5_epochs50_paper_comparison_10seed_floor_0p01",
+  "formula": "R_final = R_base * (1 + alpha * w_raw * max(P_high_used_i,P_high_used_j))",
+  "created_at": "2026-07-15T10:55:21.875256+00:00",
+  "source_fingerprints": {
+    "data_2021_node_risk.npz": "6e82c3471c375534eda0c3f5e9c63008611e3afa6220169e3e5db56f149bd809",
+    "data_2021_edge_risk.npz": "06142164ac6da47c583af03a217c63458facf54d572ebc77ce9f341e1009258c"
+  },
+  "fallbacks": [],
+  "summaries": [
+    {
+      "year": "data_2021",
+      "edge_count": 7647,
+      "base_mean": 0.014913300896648614,
+      "risk_mean": 0.015247415871148274,
+      "risk_p90": 0.007585532963275909,
+      "risk_p95": 0.06696888542855864,
+      "risk_max": 0.8673117160797119,
+      "clip_upper": 0.8673117160797119,
+      "p_high_mode": "raw",
+      "p_high_gate_threshold": 0.5,
+      "p_high_note": "P_high is used without thresholding.",
+      "p_high_raw_min": 6.58946589864102e-41,
+      "p_high_raw_max": 0.999822199344635,
+      "p_high_raw_mean": 0.06188228186889179,
+      "p_high_used_min": 6.58946589864102e-41,
+      "p_high_used_max": 0.999822199344635,
+      "p_high_used_mean": 0.06188228186889179,
+      "active_high_risk_nodes": 5261,
+      "formula": "R_final = R_base * (1 + alpha * w_raw * max(P_high_used_i,P_high_used_j))"
+    }
+  ]
+}
